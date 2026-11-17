@@ -45,7 +45,7 @@ class ActionsTab extends StatelessWidget {
             childAspectRatio: 1.5,
             children: [
               TactileTile(
-                label: stats.isMicMuted ? 'Mic Muted' : 'Mic Active',
+                label: stats.isMicMuted ? 'Mic Muted' : 'Mic Live',
                 subtitle: 'Tap to toggle mute',
                 icon: stats.isMicMuted
                     ? Icons.mic_off_rounded

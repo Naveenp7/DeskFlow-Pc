@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../services/connection_service.dart';
 import '../theme/app_theme.dart';
@@ -6,6 +7,7 @@ import 'dashboard_tab.dart';
 import 'actions_tab.dart';
 import 'trackpad_tab.dart';
 import 'share_tab.dart';
+import 'standby_screen.dart';
 import 'discovery_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -17,6 +19,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
+  bool _forceStandby = false;
 
   final List<Widget> _tabs = const [
     DashboardTab(),
@@ -25,8 +28,70 @@ class _HomeScreenState extends State<HomeScreen> {
     ShareTab(),
   ];
 
+  void _toggleStandbyOrientation() {
+    setState(() {
+      _forceStandby = !_forceStandby;
+    });
+
+    if (_forceStandby) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    } else {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+
+    // When physically in landscape or Standby Mode is triggered, render Standby Deck
+    if (isLandscape || _forceStandby) {
+      return StandbyScreen(
+        onExitStandby: () {
+          setState(() => _forceStandby = false);
+          SystemChrome.setPreferredOrientations([
+            DeviceOrientation.portraitUp,
+            DeviceOrientation.portraitDown,
+            DeviceOrientation.landscapeLeft,
+            DeviceOrientation.landscapeRight,
+          ]);
+        },
+        onOpenTrackpad: () {
+          setState(() {
+            _forceStandby = false;
+            _currentIndex = 2; // Trackpad
+          });
+          SystemChrome.setPreferredOrientations([
+            DeviceOrientation.portraitUp,
+            DeviceOrientation.portraitDown,
+            DeviceOrientation.landscapeLeft,
+            DeviceOrientation.landscapeRight,
+          ]);
+        },
+        onOpenShare: () {
+          setState(() {
+            _forceStandby = false;
+            _currentIndex = 3; // Share
+          });
+          SystemChrome.setPreferredOrientations([
+            DeviceOrientation.portraitUp,
+            DeviceOrientation.portraitDown,
+            DeviceOrientation.landscapeLeft,
+            DeviceOrientation.landscapeRight,
+          ]);
+        },
+      );
+    }
+
     final conn = context.watch<ConnectionService>();
     final isConnected = conn.isConnected;
     final isConnecting = conn.status == DeviceConnectionStatus.connecting;
@@ -66,11 +131,19 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
+          // Standby Desk Mode Button
+          IconButton(
+            icon: const Icon(Icons.dock_rounded, size: 20),
+            tooltip: 'Desk Standby Dock Mode',
+            color: AppTheme.cyan,
+            onPressed: _toggleStandbyOrientation,
+          ),
+
           // Connection Status Pill
           GestureDetector(
             onTap: () => _openDiscoveryDialog(context),
             child: Container(
-              margin: const EdgeInsets.only(right: 16),
+              margin: const EdgeInsets.only(right: 16, left: 4),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: isConnected

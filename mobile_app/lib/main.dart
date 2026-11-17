@@ -9,6 +9,14 @@ import 'theme/app_theme.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Allow auto-rotation between landscape desk dock and portrait
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
   // Set system UI overlay style for seamless immersive OLED experience
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(

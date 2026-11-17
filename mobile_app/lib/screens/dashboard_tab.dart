@@ -3,8 +3,10 @@ import 'package:provider/provider.dart';
 import '../services/connection_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_container.dart';
+import '../widgets/standby_clock.dart';
 import '../widgets/stat_gauge_card.dart';
 import '../widgets/volume_slider.dart';
+import 'discovery_dialog.dart';
 
 class DashboardTab extends StatelessWidget {
   const DashboardTab({super.key});
@@ -50,99 +52,67 @@ class DashboardTab extends StatelessWidget {
             ),
           ],
 
-          // Quick PC Glance Card
+          // Ambient Standby Clock & Status Card
           GlassContainer(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: isConnected
-                            ? AppTheme.emerald.withValues(alpha: 0.15)
-                            : AppTheme.amber.withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.computer_rounded,
-                        color: isConnected ? AppTheme.emerald : AppTheme.amber,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isConnected ? stats.hostname : 'No PC Connected',
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.textPrimary,
-                          ),
-                        ),
-                        Text(
-                          isConnected
-                              ? 'Uptime: ${stats.uptime} • ${stats.cpuCores} Cores'
-                              : 'Open PC companion on same Wi-Fi',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppTheme.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                if (stats.hasBattery)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceElevated,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppTheme.border),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          stats.isCharging
-                              ? Icons.battery_charging_full_rounded
-                              : Icons.battery_std_rounded,
-                          color: stats.batteryPercent > 20
-                              ? AppTheme.emerald
-                              : AppTheme.rose,
-                          size: 15,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${stats.batteryPercent}%',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
+            padding: const EdgeInsets.all(18),
+            child: StandbyClock(
+              hostname: stats.hostname,
+              pingMs: conn.pingMs,
+              isConnected: isConnected,
+              uptime: stats.uptime,
+              onConnectTap: () {
+                showDialog(
+                  context: context,
+                  builder: (_) => const DiscoveryDialog(),
+                );
+              },
             ),
           ),
           const SizedBox(height: 16),
 
-          // Section Title
-          const Text(
-            'SYSTEM METRICS',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.0,
-              color: AppTheme.textMuted,
-            ),
+          // Section Title: System Metrics
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.monitor_heart_outlined, color: AppTheme.cyan, size: 16),
+                  SizedBox(width: 6),
+                  Text(
+                    'SYSTEM METRICS',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.0,
+                      color: AppTheme.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+              if (stats.hasBattery)
+                Row(
+                  children: [
+                    Icon(
+                      stats.isCharging
+                          ? Icons.battery_charging_full_rounded
+                          : Icons.battery_std_rounded,
+                      color: stats.batteryPercent > 20
+                          ? AppTheme.emerald
+                          : AppTheme.rose,
+                      size: 15,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${stats.batteryPercent}%',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
           ),
           const SizedBox(height: 10),
 
@@ -153,7 +123,7 @@ class DashboardTab extends StatelessWidget {
             physics: const NeverScrollableScrollPhysics(),
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
-            childAspectRatio: 1.25,
+            childAspectRatio: 1.35,
             children: [
               StatGaugeCard(
                 title: 'CPU Usage',
@@ -202,7 +172,7 @@ class DashboardTab extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // Quick Media Player Controller
+          // Media Player Controller Bar
           GlassContainer(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Column(
@@ -228,7 +198,7 @@ class DashboardTab extends StatelessWidget {
                   children: [
                     _MediaButton(
                       icon: Icons.skip_previous_rounded,
-                      label: 'Prev',
+                      label: 'Previous',
                       onTap: () => conn.sendMediaAction('prev'),
                     ),
                     _MediaButton(

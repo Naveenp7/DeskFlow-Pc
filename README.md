@@ -18,13 +18,14 @@
 
 ## 🚀 Key Features
 
-### 1. 📊 System Telemetry Glance
-- **Real-time CPU Usage**: Live percentage with logical core count.
-- **RAM Memory**: Current usage percentage with exact used/total GB indicator.
-- **Primary Disk (C:)**: Storage capacity and utilization gauge.
-- **Network Traffic**: Real-time Upload & Download speed counter (KB/s & MB/s).
-- **Battery Status**: Live battery percentage and charging indicator for laptops.
-- **Uptime & PC Info**: Computer hostname and uptime duration.
+### 1. 🖥️ Horizontal Desk Standby Deck (PhoneBox-Style)
+- **Automatic Dock Detection**: Place your phone horizontally on your desk stand or charger dock, and the app automatically transforms into an edge-to-edge ambient **Desk Deck**!
+- **Prominent Digital Standby Clock**: Clean ambient clock with hours, minutes, seconds, full date, day of the week, and live PC connection & latency ping.
+- **Hardware Telemetry Center**: High-precision circular gauges for CPU, RAM, Disk C:, and Network KB/s with smooth 60 FPS transitions.
+- **Master Audio & Media Controls**: Integrated master volume slider with mute toggle and media control buttons (Prev, Play/Pause, Next).
+- **Macro Control Deck**: Dedicated tactile tiles for Microphone Mute, PC Lock, Snipping Tool, Show Desktop, Task Manager, and Sleep.
+- **One-Tap Mode Switcher**: Quick toggle between Standby Deck, Remote Touchpad, and Universal Clipboard Beam.
+- **Zero Hardcoded Emojis**: Replaced completely with modern, crisp vector icons and subtle neon glow accents.
 
 ### 2. 🎚️ Master Volume & Media Deck
 - **Tactile Volume Slider**: Direct control over Windows master volume with percentage feedback.

@@ -59,12 +59,12 @@ class _TactileTileState extends State<TactileTile>
         duration: const Duration(milliseconds: 100),
         curve: Curves.easeOutCubic,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
             color: widget.isActive
                 ? effectiveColor.withValues(alpha: 0.18)
                 : AppTheme.surfaceCard,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: widget.isActive
                   ? effectiveColor
@@ -75,15 +75,15 @@ class _TactileTileState extends State<TactileTile>
                 ? [
                     BoxShadow(
                       color: effectiveColor.withValues(alpha: 0.25),
-                      blurRadius: 12,
+                      blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
                   ]
                 : [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.2),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
                     ),
                   ],
           ),
@@ -95,28 +95,28 @@ class _TactileTileState extends State<TactileTile>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(5),
                     decoration: BoxDecoration(
                       color: effectiveColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
                       widget.icon,
                       color: effectiveColor,
-                      size: 20,
+                      size: 16,
                     ),
                   ),
                   if (widget.isActive)
                     Container(
-                      width: 8,
-                      height: 8,
+                      width: 6,
+                      height: 6,
                       decoration: BoxDecoration(
                         color: effectiveColor,
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
                             color: effectiveColor.withValues(alpha: 0.8),
-                            blurRadius: 6,
+                            blurRadius: 4,
                           ),
                         ],
                       ),
@@ -125,11 +125,12 @@ class _TactileTileState extends State<TactileTile>
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     widget.label,
                     style: const TextStyle(
-                      fontSize: 13,
+                      fontSize: 11,
                       fontWeight: FontWeight.w600,
                       color: AppTheme.textPrimary,
                     ),
@@ -137,11 +138,10 @@ class _TactileTileState extends State<TactileTile>
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (widget.subtitle != null) ...[
-                    const SizedBox(height: 1),
                     Text(
                       widget.subtitle!,
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 9,
                         fontWeight: FontWeight.w400,
                         color: widget.isActive
                             ? effectiveColor
