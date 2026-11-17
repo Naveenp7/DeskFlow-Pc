@@ -1,0 +1,105 @@
+# ==============================================================================
+# DeskFlow Master .gitignore
+# Only essential source code and configurations are tracked in Git.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Python & Companion Server
+# ------------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyd
+*.pyo
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+
+# ------------------------------------------------------------------------------
+# Flutter & Dart (Mobile App)
+# ------------------------------------------------------------------------------
+**/mobile_app/.dart_tool/
+**/.dart_tool/
+**/mobile_app/build/
+**/build/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/mobile_app/coverage/
+**/.pub-cache/
+**/.pub/
+
+# ------------------------------------------------------------------------------
+# Android
+# ------------------------------------------------------------------------------
+**/android/.gradle/
+**/.gradle/
+**/android/local.properties
+**/android/**/build/
+**/android/captures/
+**/android/.externalNativeBuild
+**/android/.cxx/
+*.apk
+*.aab
+
+# ------------------------------------------------------------------------------
+# iOS & macOS
+# ------------------------------------------------------------------------------
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/ephemeral/
+**/ios/Runner/GeneratedPluginRegistrant.*
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/macos/Flutter/ephemeral/
+**/macos/Flutter/GeneratedPluginRegistrant.swift
+*.xcuserdata/
+*.xcscmblueprint
+DerivedData/
+
+# ------------------------------------------------------------------------------
+# Linux & Windows Flutter Desktop
+# ------------------------------------------------------------------------------
+**/linux/flutter/ephemeral/
+**/windows/flutter/ephemeral/
+
+# ------------------------------------------------------------------------------
+# IDEs, Editors & Tooling
+# ------------------------------------------------------------------------------
+.idea/
+.idea/**
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.swp
+*.swo
+*~
+
+# ------------------------------------------------------------------------------
+# Operating System & Temporary Files
+# ------------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.tmp
+*.bak
