@@ -63,15 +63,18 @@
 ### Step 1: Start the PC Companion
 The PC companion is an ultra-lean Python service that consumes **0.0% CPU** when idle and **<18 MB RAM**.
 
-1. Navigate to the `pc_companion` directory:
-   ```cmd
-   cd pc_companion
-   ```
-2. Double-click or run:
-   ```cmd
-   run_pc_companion.bat
-   ```
-   *(Optional: Use `run_silent.vbs` if you want it to run invisibly in the background without a command window).*
+#### Option A: Automatic Silent Start on Windows Boot (Recommended)
+You only need to do this **once**:
+1. Double-click [enable_autostart.bat](file:///c:/for%20me/Phone%20pc%20widget/pc_companion/enable_autostart.bat).
+2. That's it! DeskFlow will now start automatically whenever your PC turns on.
+   - It runs completely silently in the background (no console window).
+   - Consumes **0% CPU** when you are not using the mobile app.
+   - To disable it at any time, just run [disable_autostart.bat](file:///c:/for%20me/Phone%20pc%20widget/pc_companion/disable_autostart.bat).
+
+#### Option B: Manual / Background Run
+- To start it silently right now without restarting: run [start_background.bat](file:///c:/for%20me/Phone%20pc%20widget/pc_companion/start_background.bat).
+- To run with console visible (for debugging): run [run_pc_companion.bat](file:///c:/for%20me/Phone%20pc%20widget/pc_companion/run_pc_companion.bat).
+- To stop the server at any time: run [stop_pc_companion.bat](file:///c:/for%20me/Phone%20pc%20widget/pc_companion/stop_pc_companion.bat).
 
 ---
 
