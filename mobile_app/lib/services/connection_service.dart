@@ -5,6 +5,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/pc_device.dart';
 import '../models/system_stats.dart';
+import '../models/claude_quota.dart';
+import '../models/ai_session.dart';
+import '../models/github_data.dart';
+import '../models/system_process.dart';
+import '../models/weather_media.dart';
 
 enum DeviceConnectionStatus {
   disconnected,
@@ -24,6 +29,14 @@ class ConnectionService extends ChangeNotifier {
   String? _clipboardContent;
   String? _bannerNotification;
 
+  // New PhoneBox-Style Features & State
+  ClaudeQuota _claudeQuota = ClaudeQuota.mock();
+  final List<AiSessionItem> _aiSessions = List.from(AiSessionItem.defaultList());
+  final GitHubWorkspaceData _githubData = GitHubWorkspaceData.mock();
+  final List<SystemProcessItem> _processes = List.from(SystemProcessItem.defaultList());
+  final WeatherData _weather = WeatherData.mock();
+  MediaTrackInfo _mediaTrack = MediaTrackInfo.mock();
+
   Timer? _reconnectTimer;
   final bool _autoReconnect = true;
 
@@ -35,6 +48,13 @@ class ConnectionService extends ChangeNotifier {
   String? get lastError => _lastError;
   String? get clipboardContent => _clipboardContent;
   String? get bannerNotification => _bannerNotification;
+
+  ClaudeQuota get claudeQuota => _claudeQuota;
+  List<AiSessionItem> get aiSessions => _aiSessions;
+  GitHubWorkspaceData get githubData => _githubData;
+  List<SystemProcessItem> get processes => _processes;
+  WeatherData get weather => _weather;
+  MediaTrackInfo get mediaTrack => _mediaTrack;
 
   ConnectionService() {
     _loadLastDeviceAndConnect();
@@ -113,9 +133,13 @@ class ConnectionService extends ChangeNotifier {
           final diff = now - sentTime.toInt();
           _pingMs = diff > 0 && diff < 500 ? diff : 3;
         }
+
+        // Parse optional processes, quotas, sessions if provided by companion
+        if (json.containsKey('claude')) {
+          _claudeQuota = ClaudeQuota.fromJson(json['claude']);
+        }
         notifyListeners();
       } else if (type == 'mic_state') {
-        // Updated mic state
         final isMuted = json['mic_muted'] as bool? ?? false;
         _stats = SystemStats(
           cpu: _stats.cpu,
@@ -144,7 +168,6 @@ class ConnectionService extends ChangeNotifier {
       } else if (type == 'notify') {
         _bannerNotification = json['message'] as String?;
         notifyListeners();
-        // Clear banner after 3 seconds
         Future.delayed(const Duration(seconds: 3), () {
           if (_bannerNotification != null) {
             _bannerNotification = null;
@@ -229,10 +252,32 @@ class ConnectionService extends ChangeNotifier {
 
   void sendMediaAction(String action) {
     sendCommand('media', {'action': action});
+    if (action == 'play_pause') {
+      _mediaTrack = MediaTrackInfo(
+        title: _mediaTrack.title,
+        artist: _mediaTrack.artist,
+        source: _mediaTrack.source,
+        currentSeconds: _mediaTrack.currentSeconds,
+        totalSeconds: _mediaTrack.totalSeconds,
+        isPlaying: !_mediaTrack.isPlaying,
+        volume: _mediaTrack.volume,
+      );
+      notifyListeners();
+    }
   }
 
   void setVolume(int level) {
     sendCommand('set_volume', {'level': level});
+    _mediaTrack = MediaTrackInfo(
+      title: _mediaTrack.title,
+      artist: _mediaTrack.artist,
+      source: _mediaTrack.source,
+      currentSeconds: _mediaTrack.currentSeconds,
+      totalSeconds: _mediaTrack.totalSeconds,
+      isPlaying: _mediaTrack.isPlaying,
+      volume: level,
+    );
+    notifyListeners();
   }
 
   void setMute(bool muted) {
@@ -273,6 +318,55 @@ class ConnectionService extends ChangeNotifier {
 
   void sendMouseScroll(int dy) {
     sendCommand('mouse_scroll', {'dy': dy});
+  }
+
+  // AI Session Permission Prompts
+  void respondToSessionPermission(String sessionId, bool allow) {
+    sendCommand('session_permission', {'id': sessionId, 'allow': allow});
+    final idx = _aiSessions.indexWhere((s) => s.id == sessionId);
+    if (idx != -1) {
+      final old = _aiSessions[idx];
+      _aiSessions[idx] = AiSessionItem(
+        id: old.id,
+        name: old.name,
+        provider: old.provider,
+        status: allow ? AiSessionStatus.working : AiSessionStatus.idle,
+        statusText: allow ? 'Working' : 'Denied / Idle',
+        duration: 'just now',
+      );
+      notifyListeners();
+    }
+  }
+
+  // Kill Process
+  void killProcess(String name) {
+    sendCommand('kill_process', {'name': name});
+    _processes.removeWhere((p) => p.name == name);
+    notifyListeners();
+  }
+
+  // Refresh Claude Quota
+  void refreshClaudeQuota() {
+    sendCommand('get_claude_quota');
+    _claudeQuota = ClaudeQuota(
+      sessionPct: (_claudeQuota.sessionPct + 1.0).clamp(0.0, 100.0),
+      sessionReset: _claudeQuota.sessionReset,
+      sessionStatus: _claudeQuota.sessionStatus,
+      weeklyPct: _claudeQuota.weeklyPct,
+      weeklyReset: _claudeQuota.weeklyReset,
+      weeklyStatus: _claudeQuota.weeklyStatus,
+      weeklyFablePct: _claudeQuota.weeklyFablePct,
+      weeklyFableReset: _claudeQuota.weeklyFableReset,
+      weeklyFableStatus: _claudeQuota.weeklyFableStatus,
+      codexSessionPct: _claudeQuota.codexSessionPct,
+      codexReset: _claudeQuota.codexReset,
+      lastUpdated: 'just now',
+      tier: _claudeQuota.tier,
+      tokensUsed: _claudeQuota.tokensUsed,
+      tokensTotal: _claudeQuota.tokensTotal,
+      burnRate: _claudeQuota.burnRate,
+    );
+    notifyListeners();
   }
 
   @override

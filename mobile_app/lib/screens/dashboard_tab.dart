@@ -2,20 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/connection_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/glass_container.dart';
-import '../widgets/standby_clock.dart';
-import '../widgets/stat_gauge_card.dart';
-import '../widgets/volume_slider.dart';
-import 'discovery_dialog.dart';
+import '../widgets/claude_quota_view.dart';
+import '../widgets/ai_sessions_card.dart';
+import '../widgets/github_card.dart';
+import '../widgets/spotify_media_card.dart';
+import '../widgets/wave_sparkline.dart';
+import '../widgets/processes_view.dart';
+import '../widgets/radial_glow_gauge.dart';
 
-class DashboardTab extends StatelessWidget {
+class DashboardTab extends StatefulWidget {
   const DashboardTab({super.key});
+
+  @override
+  State<DashboardTab> createState() => _DashboardTabState();
+}
+
+class _DashboardTabState extends State<DashboardTab> {
+  int _activeSection = 0; // 0: All, 1: Claude & AI, 2: GitHub, 3: Hardware, 4: Processes
 
   @override
   Widget build(BuildContext context) {
     final conn = context.watch<ConnectionService>();
     final stats = conn.stats;
-    final isConnected = conn.isConnected;
+    final claude = conn.claudeQuota;
+    final sessions = conn.aiSessions;
+    final github = conn.githubData;
+    final processes = conn.processes;
+    final media = conn.mediaTrack;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -52,241 +65,290 @@ class DashboardTab extends StatelessWidget {
             ),
           ],
 
-          // Ambient Standby Clock & Status Card
-          GlassContainer(
-            padding: const EdgeInsets.all(18),
-            child: StandbyClock(
-              hostname: stats.hostname,
-              pingMs: conn.pingMs,
-              isConnected: isConnected,
-              uptime: stats.uptime,
-              onConnectTap: () {
-                showDialog(
-                  context: context,
-                  builder: (_) => const DiscoveryDialog(),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Section Title: System Metrics
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Row(
-                children: [
-                  Icon(Icons.monitor_heart_outlined, color: AppTheme.cyan, size: 16),
-                  SizedBox(width: 6),
-                  Text(
-                    'SYSTEM METRICS',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.0,
-                      color: AppTheme.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-              if (stats.hasBattery)
-                Row(
-                  children: [
-                    Icon(
-                      stats.isCharging
-                          ? Icons.battery_charging_full_rounded
-                          : Icons.battery_std_rounded,
-                      color: stats.batteryPercent > 20
-                          ? AppTheme.emerald
-                          : AppTheme.rose,
-                      size: 15,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${stats.batteryPercent}%',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-            ],
-          ),
-          const SizedBox(height: 10),
-
-          // 4-Card System Telemetry Grid
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.35,
-            children: [
-              StatGaugeCard(
-                title: 'CPU Usage',
-                valueText: '${stats.cpu.toStringAsFixed(1)}%',
-                subText: '${stats.cpuCores} Logical Processors',
-                progress: stats.cpu / 100.0,
-                icon: Icons.speed_rounded,
-                accentColor: AppTheme.cyan,
-              ),
-              StatGaugeCard(
-                title: 'RAM Memory',
-                valueText: '${stats.ramPercent.toStringAsFixed(1)}%',
-                subText: '${stats.ramUsedGb.toStringAsFixed(1)} / ${stats.ramTotalGb.toStringAsFixed(0)} GB',
-                progress: stats.ramPercent / 100.0,
-                icon: Icons.memory_rounded,
-                accentColor: AppTheme.purple,
-              ),
-              StatGaugeCard(
-                title: 'Primary Drive C:',
-                valueText: '${stats.diskPercent.toStringAsFixed(1)}%',
-                subText: '${stats.diskUsedGb.toStringAsFixed(0)} / ${stats.diskTotalGb.toStringAsFixed(0)} GB',
-                progress: stats.diskPercent / 100.0,
-                icon: Icons.storage_rounded,
-                accentColor: AppTheme.blue,
-              ),
-              StatGaugeCard(
-                title: 'Network Traffic',
-                valueText: stats.downloadKbps > 1024
-                    ? '${(stats.downloadKbps / 1024).toStringAsFixed(1)} MB/s'
-                    : '${stats.downloadKbps.toStringAsFixed(0)} KB/s',
-                subText: 'Up: ${stats.uploadKbps.toStringAsFixed(0)} KB/s',
-                progress: (stats.downloadKbps / 10240).clamp(0.0, 1.0),
-                icon: Icons.swap_vert_rounded,
-                accentColor: AppTheme.emerald,
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-
-          // Volume Control Section
-          VolumeControlWidget(
-            volumeLevel: stats.volumeLevel,
-            isMuted: stats.isMuted,
-            onVolumeChanged: (val) => conn.setVolume(val),
-            onToggleMute: () => conn.setMute(!stats.isMuted),
-          ),
-          const SizedBox(height: 16),
-
-          // Media Player Controller Bar
-          GlassContainer(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // Quick Filter Segment Bar
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
               children: [
-                const Row(
-                  children: [
-                    Icon(Icons.music_note_rounded, color: AppTheme.purple, size: 18),
-                    SizedBox(width: 8),
-                    Text(
-                      'Media Playback Controls',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                  ],
+                _FilterChip(
+                  label: 'Full Deck',
+                  isSelected: _activeSection == 0,
+                  icon: Icons.dashboard_customize_rounded,
+                  onTap: () => setState(() => _activeSection = 0),
                 ),
-                const SizedBox(height: 14),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _MediaButton(
-                      icon: Icons.skip_previous_rounded,
-                      label: 'Previous',
-                      onTap: () => conn.sendMediaAction('prev'),
-                    ),
-                    _MediaButton(
-                      icon: Icons.play_arrow_rounded,
-                      label: 'Play / Pause',
-                      isPrimary: true,
-                      onTap: () => conn.sendMediaAction('play_pause'),
-                    ),
-                    _MediaButton(
-                      icon: Icons.skip_next_rounded,
-                      label: 'Next',
-                      onTap: () => conn.sendMediaAction('next'),
-                    ),
-                  ],
+                _FilterChip(
+                  label: 'Claude & Sessions',
+                  isSelected: _activeSection == 1,
+                  icon: Icons.auto_awesome_rounded,
+                  accentColor: const Color(0xFFFF6E3A),
+                  onTap: () => setState(() => _activeSection = 1),
+                ),
+                _FilterChip(
+                  label: 'GitHub PRs',
+                  isSelected: _activeSection == 2,
+                  icon: Icons.code_rounded,
+                  accentColor: const Color(0xFFFBBF24),
+                  onTap: () => setState(() => _activeSection = 2),
+                ),
+                _FilterChip(
+                  label: 'Hardware & Waves',
+                  isSelected: _activeSection == 3,
+                  icon: Icons.monitor_heart_rounded,
+                  accentColor: const Color(0xFF00E5FF),
+                  onTap: () => setState(() => _activeSection = 3),
+                ),
+                _FilterChip(
+                  label: 'Processes',
+                  isSelected: _activeSection == 4,
+                  icon: Icons.dns_rounded,
+                  accentColor: const Color(0xFFF472B6),
+                  onTap: () => setState(() => _activeSection = 4),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 14),
+
+          // 1. CLAUDE CODE QUOTA & CREDITS VIEW
+          if (_activeSection == 0 || _activeSection == 1) ...[
+            SizedBox(
+              height: 250,
+              child: ClaudeQuotaView(
+                quota: claude,
+                onRefresh: () => conn.refreshClaudeQuota(),
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          // 2. AI SESSIONS CARD
+          if (_activeSection == 0 || _activeSection == 1) ...[
+            SizedBox(
+              height: 260,
+              child: AiSessionsCard(
+                sessions: sessions,
+                onPermissionResponse: (session, allow) {
+                  conn.respondToSessionPermission(session.id, allow);
+                },
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          // 3. GITHUB REVIEWS & PRS
+          if (_activeSection == 0 || _activeSection == 2) ...[
+            SizedBox(
+              height: 270,
+              child: GitHubCard(
+                data: github,
+                onOpenUrl: (url) => conn.openUrlOnPc(url),
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          // 4. SPOTIFY MEDIA CARD
+          if (_activeSection == 0) ...[
+            SpotifyMediaCard(
+              track: media,
+              compact: false,
+              onPlayPause: () => conn.sendMediaAction('play_pause'),
+              onNext: () => conn.sendMediaAction('next'),
+              onPrev: () => conn.sendMediaAction('prev'),
+              onVolumeChanged: (v) => conn.setVolume(v),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          // 5. HARDWARE WAVE GRAPHS & RADIAL GAUGES
+          if (_activeSection == 0 || _activeSection == 3) ...[
+            const Row(
+              children: [
+                Icon(Icons.speed_rounded, color: AppTheme.cyan, size: 16),
+                SizedBox(width: 6),
+                Text(
+                  'TELEMETRY & HARDWARE WAVES',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                    color: AppTheme.textMuted,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // 4 Radial Arc Gauges Row
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10121A),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFF1E212E), width: 1),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  RadialGlowGauge(
+                    percentage: stats.cpu > 0 ? stats.cpu : 27.0,
+                    centerText: '${(stats.cpu > 0 ? stats.cpu : 27.0).toInt()}%',
+                    label: 'CPU',
+                    subText: '68°C',
+                    primaryColor: const Color(0xFF00E5FF),
+                    size: 72,
+                    strokeWidth: 6.5,
+                    showPointer: false,
+                  ),
+                  const RadialGlowGauge(
+                    percentage: 7.0,
+                    centerText: '7%',
+                    label: 'GPU',
+                    subText: '60°C · 58 W',
+                    primaryColor: Color(0xFF84CC16),
+                    size: 72,
+                    strokeWidth: 6.5,
+                    showPointer: false,
+                  ),
+                  RadialGlowGauge(
+                    percentage: (stats.ramUsedGb / (stats.ramTotalGb > 0 ? stats.ramTotalGb : 64) * 100).clamp(0.0, 100.0),
+                    centerText: '${stats.ramUsedGb > 0 ? stats.ramUsedGb.toStringAsFixed(1) : '23.7'} GB',
+                    label: 'RAM',
+                    subText: '${stats.ramUsedGb > 0 ? stats.ramUsedGb.toStringAsFixed(1) : '23.7'} / ${stats.ramTotalGb > 0 ? stats.ramTotalGb.toInt() : 64} GB',
+                    primaryColor: const Color(0xFFA855F7),
+                    size: 72,
+                    strokeWidth: 6.5,
+                    showPointer: false,
+                  ),
+                  const RadialGlowGauge(
+                    percentage: 60.0,
+                    centerText: '60°C',
+                    label: 'GPU TEMP',
+                    subText: 'Fan 34%',
+                    primaryColor: Color(0xFFFF6E3A),
+                    size: 72,
+                    strokeWidth: 6.5,
+                    showPointer: false,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Waves 2x2 Grid
+            GridView.count(
+              crossAxisCount: 2,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              childAspectRatio: 1.6,
+              physics: const NeverScrollableScrollPhysics(),
+              shrinkWrap: true,
+              children: [
+                WaveSparklineCard(
+                  title: 'CPU Usage',
+                  valueText: '${(stats.cpu > 0 ? stats.cpu : 14.0).toStringAsFixed(0)}%',
+                  subText: '54°C · ${stats.cpuCores} Cores',
+                  primaryColor: const Color(0xFF00E5FF),
+                ),
+                const WaveSparklineCard(
+                  title: 'GPU RTX 4080',
+                  valueText: '7%',
+                  subText: '53°C · 38 W',
+                  primaryColor: Color(0xFF84CC16),
+                ),
+                WaveSparklineCard(
+                  title: 'RAM Memory',
+                  valueText: '${stats.ramPercent > 0 ? stats.ramPercent.toStringAsFixed(0) : '33'}%',
+                  subText: '${stats.ramUsedGb > 0 ? stats.ramUsedGb.toStringAsFixed(1) : '21.2'} / ${stats.ramTotalGb > 0 ? stats.ramTotalGb.toInt() : 64} GB',
+                  primaryColor: const Color(0xFFA855F7),
+                ),
+                WaveSparklineCard(
+                  title: 'Network',
+                  valueText: '↓ ${(stats.downloadKbps > 0 ? stats.downloadKbps / 1024 : 8.7).toStringAsFixed(1)} MB/s',
+                  subText: '↑ ${(stats.uploadKbps > 0 ? stats.uploadKbps : 332).toStringAsFixed(0)} KB/s',
+                  primaryColor: const Color(0xFFF59E0B),
+                  secondaryColor: const Color(0xFF00E5FF),
+                  isNetworkDual: true,
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          // 6. PROCESSES & TASK MANAGER
+          if (_activeSection == 0 || _activeSection == 4) ...[
+            SizedBox(
+              height: 380,
+              child: ProcessesView(
+                processes: processes,
+                onProcessAction: (item, action) {
+                  if (action == 'kill') {
+                    conn.killProcess(item.name);
+                  }
+                },
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
         ],
       ),
     );
   }
 }
 
-class _MediaButton extends StatelessWidget {
-  final IconData icon;
+class _FilterChip extends StatelessWidget {
   final String label;
+  final bool isSelected;
+  final IconData icon;
+  final Color? accentColor;
   final VoidCallback onTap;
-  final bool isPrimary;
 
-  const _MediaButton({
-    required this.icon,
+  const _FilterChip({
     required this.label,
+    required this.isSelected,
+    required this.icon,
+    this.accentColor,
     required this.onTap,
-    this.isPrimary = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final color = accentColor ?? AppTheme.cyan;
+
     return GestureDetector(
       onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: isPrimary ? 54 : 46,
-            height: isPrimary ? 54 : 46,
-            decoration: BoxDecoration(
-              gradient: isPrimary
-                  ? const LinearGradient(
-                      colors: [AppTheme.purple, AppTheme.cyan],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    )
-                  : null,
-              color: isPrimary ? null : AppTheme.surfaceElevated,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: isPrimary ? AppTheme.cyan : AppTheme.border,
-                width: 1,
-              ),
-              boxShadow: isPrimary
-                  ? [
-                      BoxShadow(
-                        color: AppTheme.purple.withValues(alpha: 0.4),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ]
-                  : null,
-            ),
-            child: Icon(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withValues(alpha: 0.18) : const Color(0xFF141724),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? color.withValues(alpha: 0.6) : const Color(0xFF1F2336),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
               icon,
-              color: isPrimary ? Colors.white : AppTheme.textPrimary,
-              size: isPrimary ? 28 : 22,
+              size: 13,
+              color: isSelected ? color : Colors.white54,
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-              color: AppTheme.textSecondary,
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? Colors.white : Colors.white70,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

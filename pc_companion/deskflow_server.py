@@ -479,6 +479,9 @@ class DeskFlowServer:
                 os.system("start taskmgr")
             elif action == "sleep_pc":
                 ctypes.windll.PowrProf.SetSuspendState(0, 1, 0)
+            elif action == "screen_off":
+                # WM_SYSCOMMAND = 0x0112, SC_MONITORPOWER = 0xF170, 2 = Turn off monitor
+                user32.SendMessageW(0xFFFF, 0x0112, 0xF170, 2)
 
         # --- APP LAUNCHERS ---
         elif action_type == "launch":
@@ -495,8 +498,38 @@ class DeskFlowServer:
                 os.system("start notepad")
             elif app == "spotify":
                 os.system("start spotify")
+            elif app == "files":
+                os.system("start explorer")
+            elif app == "discord":
+                os.system("start discord:")
             elif app == "settings":
                 os.system("start ms-settings:")
+
+        # --- AI SESSIONS & PROCESS CONTROL ---
+        elif action_type == "session_permission":
+            session_id = payload.get("id", "")
+            allow = payload.get("allow", True)
+            print(f"[Session Permission] {session_id} -> {'ALLOWED' if allow else 'DENIED'}")
+            await ws.send(json.dumps({
+                "type": "notify",
+                "message": f"Session '{session_id}' permission {'ALLOWED' if allow else 'DENIED'}"
+            }))
+
+        elif action_type == "kill_process":
+            proc_name = payload.get("name", "").lower()
+            killed_count = 0
+            if proc_name:
+                for proc in psutil.process_iter(['name']):
+                    try:
+                        if proc.info['name'] and proc_name in proc.info['name'].lower():
+                            proc.terminate()
+                            killed_count += 1
+                    except Exception:
+                        pass
+            await ws.send(json.dumps({
+                "type": "notify",
+                "message": f"Terminated {killed_count} instances of {payload.get('name')}"
+            }))
 
         # --- UNIVERSAL CLIPBOARD & SHARE ---
         elif action_type == "clipboard_send":

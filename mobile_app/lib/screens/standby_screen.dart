@@ -1,14 +1,23 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/ai_session.dart';
 import '../services/connection_service.dart';
-import '../theme/app_theme.dart';
-import '../widgets/animated_gauge.dart';
-import '../widgets/standby_clock.dart';
-import '../widgets/tactile_tile.dart';
-import '../widgets/volume_slider.dart';
+import '../widgets/radial_glow_gauge.dart';
+import '../widgets/claude_quota_view.dart';
+import '../widgets/ai_sessions_card.dart';
+import '../widgets/github_card.dart';
+import '../widgets/processes_view.dart';
+import '../widgets/hardware_waves_view.dart';
+import '../widgets/spotify_media_card.dart';
+import '../widgets/weather_forecast_card.dart';
+import '../widgets/tactile_deck_grid.dart';
+import '../widgets/docker_storage_card.dart';
+import '../widgets/desk_status_header.dart';
+import '../widgets/desk_pagination_bar.dart';
 import 'discovery_dialog.dart';
 
-class StandbyScreen extends StatelessWidget {
+class StandbyScreen extends StatefulWidget {
   final VoidCallback onExitStandby;
   final VoidCallback onOpenTrackpad;
   final VoidCallback onOpenShare;
@@ -21,466 +30,264 @@ class StandbyScreen extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final conn = context.watch<ConnectionService>();
-    final stats = conn.stats;
-    final isConnected = conn.isConnected;
+  State<StandbyScreen> createState() => _StandbyScreenState();
+}
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Column(
-            children: [
-              // Sleek Desk Top Status Bar
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Flexible(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [AppTheme.cyan, AppTheme.purple],
-                            ),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Icon(
-                            Icons.hub_rounded,
-                            color: Colors.white,
-                            size: 13,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        const Text(
-                          'DeskFlow',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.4,
-                            color: AppTheme.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                          decoration: BoxDecoration(
-                            color: AppTheme.cyan.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text(
-                            'STANDBY DECK',
-                            style: TextStyle(
-                              fontSize: 8.5,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.8,
-                              color: AppTheme.cyan,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (stats.hasBattery) ...[
-                        Icon(
-                          stats.isCharging
-                              ? Icons.battery_charging_full_rounded
-                              : Icons.battery_std_rounded,
-                          size: 13,
-                          color: stats.batteryPercent > 20
-                              ? AppTheme.emerald
-                              : AppTheme.rose,
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${stats.batteryPercent}%',
-                          style: const TextStyle(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                      ],
-                      IconButton(
-                        icon: const Icon(Icons.fullscreen_exit_rounded, size: 18),
-                        tooltip: 'Exit Standby',
-                        color: AppTheme.textMuted,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        onPressed: onExitStandby,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
+class _StandbyScreenState extends State<StandbyScreen> {
+  late PageController _pageController;
+  int _currentPage = 0;
+  bool _isAutoCycle = false;
+  Timer? _cycleTimer;
 
-              // Main 3-Column Desk Grid
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // ==========================================
-                    // COLUMN 1: STANDBY CLOCK & MEDIA / AUDIO
-                    // ==========================================
-                    Expanded(
-                      flex: 32,
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppTheme.surfaceCard.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppTheme.border),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            // Standby Clock & Status
-                            StandbyClock(
-                              hostname: stats.hostname,
-                              pingMs: conn.pingMs,
-                              isConnected: isConnected,
-                              uptime: stats.uptime,
-                              onConnectTap: () => _openDiscovery(context),
-                            ),
+  static const List<String> _pageTitles = [
+    'Overview Deck',
+    'Claude Quotas',
+    'Sessions & GitHub',
+    'Hardware Waves',
+    'Task Manager',
+    'Multi-Metric',
+    'Media & Forecast',
+    'Docker & Storage',
+  ];
 
-                            // Volume Slider & Mute (Compact Mode)
-                            VolumeControlWidget(
-                              volumeLevel: stats.volumeLevel,
-                              isMuted: stats.isMuted,
-                              compact: true,
-                              onVolumeChanged: (val) => conn.setVolume(val),
-                              onToggleMute: () => conn.setMute(!stats.isMuted),
-                            ),
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
 
-                            // Compact Media Control Bar
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppTheme.surfaceElevated,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: AppTheme.border),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.skip_previous_rounded, size: 16),
-                                    color: AppTheme.textPrimary,
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                    onPressed: () => conn.sendMediaAction('prev'),
-                                    tooltip: 'Previous Track',
-                                  ),
-                                  Container(
-                                    width: 30,
-                                    height: 30,
-                                    decoration: const BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      gradient: LinearGradient(
-                                        colors: [AppTheme.purple, AppTheme.cyan],
-                                      ),
-                                    ),
-                                    child: IconButton(
-                                      icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                                      color: Colors.white,
-                                      padding: EdgeInsets.zero,
-                                      onPressed: () => conn.sendMediaAction('play_pause'),
-                                      tooltip: 'Play / Pause',
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.skip_next_rounded, size: 16),
-                                    color: AppTheme.textPrimary,
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                    onPressed: () => conn.sendMediaAction('next'),
-                                    tooltip: 'Next Track',
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+  @override
+  void dispose() {
+    _cycleTimer?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
 
-                    const SizedBox(width: 6),
+  void _toggleAutoCycle() {
+    setState(() {
+      _isAutoCycle = !_isAutoCycle;
+      if (_isAutoCycle) {
+        _cycleTimer = Timer.periodic(const Duration(seconds: 12), (_) {
+          if (!mounted) return;
+          final nextPage = (_currentPage + 1) % _pageTitles.length;
+          _pageController.animateToPage(
+            nextPage,
+            duration: const Duration(milliseconds: 650),
+            curve: Curves.easeInOutCubic,
+          );
+        });
+      } else {
+        _cycleTimer?.cancel();
+        _cycleTimer = null;
+      }
+    });
+  }
 
-                    // ==========================================
-                    // COLUMN 2: HARDWARE TELEMETRY GAUGES
-                    // ==========================================
-                    Expanded(
-                      flex: 38,
-                      child: Column(
-                        children: [
-                          // 4 Performance Gauges (2x2 Grid)
-                          Expanded(
-                            child: GridView.count(
-                              crossAxisCount: 2,
-                              crossAxisSpacing: 6,
-                              mainAxisSpacing: 6,
-                              childAspectRatio: 1.85,
-                              physics: const NeverScrollableScrollPhysics(),
-                              children: [
-                                AnimatedGauge(
-                                  label: 'CPU Usage',
-                                  percentage: stats.cpu,
-                                  valueText: '${stats.cpu.toStringAsFixed(1)}%',
-                                  subText: '${stats.cpuCores} Threads',
-                                  icon: Icons.speed_rounded,
-                                  accentColor: AppTheme.cyan,
-                                ),
-                                AnimatedGauge(
-                                  label: 'RAM Memory',
-                                  percentage: stats.ramPercent,
-                                  valueText: '${stats.ramPercent.toStringAsFixed(0)}%',
-                                  subText: '${stats.ramUsedGb.toStringAsFixed(1)} / ${stats.ramTotalGb.toStringAsFixed(0)} GB',
-                                  icon: Icons.memory_rounded,
-                                  accentColor: AppTheme.purple,
-                                ),
-                                AnimatedGauge(
-                                  label: 'Disk (C:)',
-                                  percentage: stats.diskPercent,
-                                  valueText: '${stats.diskPercent.toStringAsFixed(0)}%',
-                                  subText: '${stats.diskUsedGb.toStringAsFixed(0)} / ${stats.diskTotalGb.toStringAsFixed(0)} GB',
-                                  icon: Icons.storage_rounded,
-                                  accentColor: AppTheme.blue,
-                                ),
-                                AnimatedGauge(
-                                  label: 'Network',
-                                  percentage: (stats.downloadKbps / 10240 * 100).clamp(0.0, 100.0),
-                                  valueText: stats.downloadKbps > 1024
-                                      ? '${(stats.downloadKbps / 1024).toStringAsFixed(1)} MB/s'
-                                      : '${stats.downloadKbps.toStringAsFixed(0)} KB/s',
-                                  subText: 'Up: ${stats.uploadKbps.toStringAsFixed(0)} KB/s',
-                                  icon: Icons.swap_vert_rounded,
-                                  accentColor: AppTheme.emerald,
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(height: 4),
-
-                          // Quick Mode Utility Bar
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _UtilityPill(
-                                  icon: Icons.mouse_rounded,
-                                  label: 'Trackpad',
-                                  onTap: onOpenTrackpad,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: _UtilityPill(
-                                  icon: Icons.share_rounded,
-                                  label: 'Beam Link',
-                                  onTap: onOpenShare,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: _UtilityPill(
-                                  icon: Icons.screen_rotation_rounded,
-                                  label: 'Standard',
-                                  onTap: onExitStandby,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(width: 6),
-
-                    // ==========================================
-                    // COLUMN 3: TACTILE ACTION DECK & LAUNCHERS
-                    // ==========================================
-                    Expanded(
-                      flex: 30,
-                      child: Column(
-                        children: [
-                          // Stream-Deck Style 6-Tile Grid
-                          Expanded(
-                            child: GridView.count(
-                              crossAxisCount: 2,
-                              crossAxisSpacing: 6,
-                              mainAxisSpacing: 6,
-                              childAspectRatio: 1.85,
-                              physics: const NeverScrollableScrollPhysics(),
-                              children: [
-                                TactileTile(
-                                  label: stats.isMicMuted ? 'Muted' : 'Mic Live',
-                                  subtitle: 'Toggle',
-                                  icon: stats.isMicMuted
-                                      ? Icons.mic_off_rounded
-                                      : Icons.mic_rounded,
-                                  accentColor: stats.isMicMuted
-                                      ? AppTheme.rose
-                                      : AppTheme.emerald,
-                                  isActive: stats.isMicMuted,
-                                  onTap: () => conn.toggleMic(),
-                                ),
-                                TactileTile(
-                                  label: 'Lock PC',
-                                  subtitle: 'Lock screen',
-                                  icon: Icons.lock_outline_rounded,
-                                  accentColor: AppTheme.amber,
-                                  onTap: () => conn.sendSystemAction('lock_pc'),
-                                ),
-                                TactileTile(
-                                  label: 'Snippet',
-                                  subtitle: 'Win+Shift+S',
-                                  icon: Icons.crop_free_rounded,
-                                  accentColor: AppTheme.cyan,
-                                  onTap: () => conn.sendSystemAction('screenshot'),
-                                ),
-                                TactileTile(
-                                  label: 'Desktop',
-                                  subtitle: 'Win + D',
-                                  icon: Icons.desktop_windows_rounded,
-                                  accentColor: AppTheme.blue,
-                                  onTap: () => conn.sendSystemAction('show_desktop'),
-                                ),
-                                TactileTile(
-                                  label: 'Task Mgr',
-                                  subtitle: 'Ctrl+Shift+Esc',
-                                  icon: Icons.analytics_outlined,
-                                  accentColor: AppTheme.purple,
-                                  onTap: () => conn.sendSystemAction('task_manager'),
-                                ),
-                                TactileTile(
-                                  label: 'Sleep PC',
-                                  subtitle: 'Standby',
-                                  icon: Icons.nightlight_round,
-                                  accentColor: AppTheme.rose,
-                                  isDestructive: true,
-                                  onTap: () => conn.sendSystemAction('sleep_pc'),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(height: 4),
-
-                          // Quick App Launcher Bar
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: [
-                                _SmallAppIcon(
-                                  icon: Icons.code_rounded,
-                                  color: const Color(0xFF007ACC),
-                                  tooltip: 'VS Code',
-                                  onTap: () => conn.launchApp('vscode'),
-                                ),
-                                const SizedBox(width: 4),
-                                _SmallAppIcon(
-                                  icon: Icons.terminal_rounded,
-                                  color: const Color(0xFF4E54C8),
-                                  tooltip: 'Terminal',
-                                  onTap: () => conn.launchApp('terminal'),
-                                ),
-                                const SizedBox(width: 4),
-                                _SmallAppIcon(
-                                  icon: Icons.language_rounded,
-                                  color: const Color(0xFF4285F4),
-                                  tooltip: 'Browser',
-                                  onTap: () => conn.launchApp('browser'),
-                                ),
-                                const SizedBox(width: 4),
-                                _SmallAppIcon(
-                                  icon: Icons.album_rounded,
-                                  color: const Color(0xFF1DB954),
-                                  tooltip: 'Spotify',
-                                  onTap: () => conn.launchApp('spotify'),
-                                ),
-                                const SizedBox(width: 4),
-                                _SmallAppIcon(
-                                  icon: Icons.calculate_rounded,
-                                  color: const Color(0xFFFF9900),
-                                  tooltip: 'Calculator',
-                                  onTap: () => conn.launchApp('calculator'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+  void _goToPage(int page) {
+    _pageController.animateToPage(
+      page,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOutCubic,
     );
   }
 
   void _openDiscovery(BuildContext context) {
     showDialog(
       context: context,
-      builder: (_) => const DiscoveryDialog(),
+      barrierDismissible: true,
+      builder: (ctx) => const DiscoveryDialog(),
     );
   }
-}
 
-class _UtilityPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _UtilityPill({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
+  void _handleDeckAction(BuildContext context, ConnectionService conn, String action) {
+    if (action == 'trackpad') {
+      widget.onOpenTrackpad();
+    } else if (action == 'share') {
+      widget.onOpenShare();
+    } else if (action == 'screen_off') {
+      conn.sendSystemAction('screen_off');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Turning off PC display...'),
+          duration: Duration(seconds: 1),
+          backgroundColor: Color(0xFF1E2130),
+        ),
+      );
+    } else if (action == 'mute') {
+      conn.setMute(!conn.stats.isMuted);
+    } else if (['lock_pc', 'screenshot', 'task_manager'].contains(action)) {
+      conn.sendSystemAction(action);
+    } else {
+      conn.launchApp(action);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 3),
-          decoration: BoxDecoration(
-            color: AppTheme.surfaceElevated,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppTheme.border),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
+    final conn = context.watch<ConnectionService>();
+    final stats = conn.stats;
+    final isConnected = conn.isConnected;
+    final claude = conn.claudeQuota;
+    final sessions = conn.aiSessions;
+    final github = conn.githubData;
+    final processes = conn.processes;
+    final weather = conn.weather;
+    final media = conn.mediaTrack;
+
+    final waitingCount =
+        sessions.where((s) => s.status == AiSessionStatus.waiting).length;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF090A0F),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          child: Column(
             children: [
-              Icon(icon, size: 11, color: AppTheme.cyan),
-              const SizedBox(width: 2),
-              Flexible(
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 8.5,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimary,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+              // 1. Top Desk Status Bar
+              DeskStatusHeader(
+                hostname: stats.hostname.isNotEmpty ? stats.hostname : 'DESK-PC',
+                isConnected: isConnected,
+                batteryPercent: stats.hasBattery ? stats.batteryPercent : 82,
+                isCharging: stats.isCharging,
+                claudePct: claude.sessionPct,
+                codexPct: claude.codexSessionPct,
+                waitingCount: waitingCount,
+                onExit: widget.onExitStandby,
+                onConnectTap: () => _openDiscovery(context),
+                onWaitingTap: () => _goToPage(2), // jump to Sessions & GitHub
+              ),
+
+              const SizedBox(height: 4),
+
+              // 2. Main PageView Deck
+              Expanded(
+                child: PageView(
+                  controller: _pageController,
+                  physics: const BouncingScrollPhysics(),
+                  onPageChanged: (idx) {
+                    setState(() => _currentPage = idx);
+                  },
+                  children: [
+                    // ==========================================
+                    // PAGE 0: OVERVIEW DECK (Screenshots 1 & 2)
+                    // ==========================================
+                    _buildOverviewDeck(context, conn, stats, weather, media),
+
+                    // ==========================================
+                    // PAGE 1: CLAUDE CODE QUOTAS (Screenshot 3)
+                    // ==========================================
+                    ClaudeQuotaView(
+                      quota: claude,
+                      onRefresh: () => conn.refreshClaudeQuota(),
+                    ),
+
+                    // ==========================================
+                    // PAGE 2: AI SESSIONS & GITHUB (Screenshot 4)
+                    // ==========================================
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          flex: 52,
+                          child: AiSessionsCard(
+                            sessions: sessions,
+                            onPermissionResponse: (session, allow) {
+                              conn.respondToSessionPermission(session.id, allow);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 48,
+                          child: GitHubCard(
+                            data: github,
+                            onOpenUrl: (url) => conn.openUrlOnPc(url),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // ==========================================
+                    // PAGE 3: HARDWARE WAVES (Screenshot 5)
+                    // ==========================================
+                    HardwareWavesView(
+                      cpuPct: stats.cpu > 0 ? stats.cpu : 10.0,
+                      cpuTemp: '53°C',
+                      gpuPct: 7.0,
+                      gpuTemp: '53°C · 38 W',
+                      ramUsedGb: stats.ramUsedGb > 0 ? stats.ramUsedGb : 21.2,
+                      ramTotalGb: stats.ramTotalGb > 0 ? stats.ramTotalGb : 64.0,
+                      vramUsedGb: 5.8,
+                      vramTotalGb: 16.0,
+                      downMBs: stats.downloadKbps > 0
+                          ? stats.downloadKbps / 1024
+                          : 8.7,
+                      upKBs: stats.uploadKbps > 0 ? stats.uploadKbps : 332.0,
+                      pingMs: conn.pingMs > 0 ? conn.pingMs : 9,
+                      uptime: stats.uptime,
+                    ),
+
+                    // ==========================================
+                    // PAGE 4: PROCESSES & TASK MANAGER (Screenshot 6)
+                    // ==========================================
+                    ProcessesView(
+                      processes: processes,
+                      onProcessAction: (item, action) {
+                        if (action == 'kill') {
+                          conn.killProcess(item.name);
+                        }
+                      },
+                    ),
+
+                    // ==========================================
+                    // PAGE 5: MULTI-METRIC DECK (Screenshot 8)
+                    // ==========================================
+                    _buildMultiMetricDeck(conn, claude, stats, processes, sessions),
+
+                    // ==========================================
+                    // PAGE 6: MEDIA PLAYER & 7-DAY FORECAST (Screenshot 7)
+                    // ==========================================
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          flex: 52,
+                          child: SpotifyMediaCard(
+                            track: media,
+                            compact: false,
+                            onPlayPause: () => conn.sendMediaAction('play_pause'),
+                            onNext: () => conn.sendMediaAction('next'),
+                            onPrev: () => conn.sendMediaAction('prev'),
+                            onVolumeChanged: (v) => conn.setVolume(v),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 48,
+                          child: WeatherForecastCard(weather: weather),
+                        ),
+                      ],
+                    ),
+
+                    // ==========================================
+                    // PAGE 7: DOCKER & STORAGE DECK (Screenshot 9)
+                    // ==========================================
+                    _buildDockerStorageDeck(conn, stats, sessions, github),
+                  ],
                 ),
+              ),
+
+              const SizedBox(height: 4),
+
+              // 3. Bottom Pagination Bar (Dots with Auto-Cycle)
+              DeskPaginationBar(
+                totalPages: _pageTitles.length,
+                currentPage: _currentPage,
+                pageTitle: _pageTitles[_currentPage],
+                isAutoCycle: _isAutoCycle,
+                onPageSelected: _goToPage,
+                onToggleAutoCycle: _toggleAutoCycle,
               ),
             ],
           ),
@@ -488,41 +295,617 @@ class _UtilityPill extends StatelessWidget {
       ),
     );
   }
+
+  // Page 0: Overview Deck with Clock, 4 Radial Gauges, Media & Tactile Action Deck
+  Widget _buildOverviewDeck(
+    BuildContext context,
+    ConnectionService conn,
+    dynamic stats,
+    dynamic weather,
+    dynamic media,
+  ) {
+    final cpuVal = stats.cpu > 0 ? stats.cpu : 27.0;
+    final ramUsed = stats.ramUsedGb > 0 ? stats.ramUsedGb : 23.7;
+    final ramTotal = stats.ramTotalGb > 0 ? stats.ramTotalGb : 64.0;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Left Column (flex: 38): Clock & Weather + Media Card
+        Expanded(
+          flex: 38,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Big Clock + Tallinn Weather
+              Expanded(
+                flex: 48,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10121A),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF1E212E), width: 1),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Clock with superscript seconds
+                      _OverviewClockHeader(),
+                      // Weather row
+                      Row(
+                        children: [
+                          const Icon(Icons.wb_cloudy_rounded,
+                              size: 14, color: Color(0xFF94A3B8)),
+                          const SizedBox(width: 4),
+                          const Flexible(
+                            child: Text(
+                              '6°  Overcast · Tallinn',
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white70,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '↑6° ↓3° · Feels like 2°',
+                            style: TextStyle(
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white.withValues(alpha: 0.4),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+
+              // Compact Spotify Media Player
+              Expanded(
+                flex: 52,
+                child: SpotifyMediaCard(
+                  track: media,
+                  compact: true,
+                  onPlayPause: () => conn.sendMediaAction('play_pause'),
+                  onNext: () => conn.sendMediaAction('next'),
+                  onPrev: () => conn.sendMediaAction('prev'),
+                  onVolumeChanged: (v) => conn.setVolume(v),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+
+        // Right Column (flex: 62): 4 Radial Gauges + 12 Action Buttons Deck
+        Expanded(
+          flex: 62,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Top: 4 Radial Arc Gauges (CPU, GPU, RAM, GPU TEMP)
+              Expanded(
+                flex: 48,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10121A),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF1E212E), width: 1),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      RadialGlowGauge(
+                        percentage: cpuVal,
+                        centerText: '${cpuVal.toInt()}%',
+                        label: 'CPU',
+                        subText: '68°C',
+                        primaryColor: const Color(0xFF00E5FF),
+                        secondaryColor: const Color(0xFF00B4D8),
+                        size: 78,
+                        strokeWidth: 7,
+                        showPointer: false,
+                      ),
+                      const RadialGlowGauge(
+                        percentage: 7.0,
+                        centerText: '7%',
+                        label: 'GPU',
+                        subText: '60°C · 58 W',
+                        primaryColor: Color(0xFF84CC16),
+                        secondaryColor: Color(0xFF65A30D),
+                        size: 78,
+                        strokeWidth: 7,
+                        showPointer: false,
+                      ),
+                      RadialGlowGauge(
+                        percentage: (ramUsed / ramTotal * 100).clamp(0.0, 100.0),
+                        centerText: '${ramUsed.toStringAsFixed(1)} GB',
+                        label: 'RAM',
+                        subText: '${ramUsed.toStringAsFixed(1)} / ${ramTotal.toInt()} GB',
+                        primaryColor: const Color(0xFFA855F7),
+                        secondaryColor: const Color(0xFF9333EA),
+                        size: 78,
+                        strokeWidth: 7,
+                        showPointer: false,
+                      ),
+                      const RadialGlowGauge(
+                        percentage: 60.0,
+                        centerText: '60°C',
+                        label: 'GPU TEMP',
+                        subText: 'Fan 34% · 2520 MHz',
+                        primaryColor: Color(0xFFFF6E3A),
+                        secondaryColor: Color(0xFFEA580C),
+                        size: 78,
+                        strokeWidth: 7,
+                        showPointer: false,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+
+              // Bottom: 12 Tactile Action Buttons
+              Expanded(
+                flex: 52,
+                child: TactileDeckGrid(
+                  isMuted: stats.isMuted,
+                  onActionTriggered: (action) =>
+                      _handleDeckAction(context, conn, action),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Page 5: Multi-Metric Deck (Screenshot 8)
+  Widget _buildMultiMetricDeck(
+    ConnectionService conn,
+    dynamic claude,
+    dynamic stats,
+    dynamic processes,
+    dynamic sessions,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Top 4 Radial Gauges: Claude session, Claude weekly, Codex session, Phone
+        Expanded(
+          flex: 48,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF10121A),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF1E212E), width: 1),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                RadialGlowGauge(
+                  percentage: claude.sessionPct,
+                  centerText: '${claude.sessionPct.toInt()}%',
+                  label: 'Claude · 5-hour',
+                  subText: 'resets in 2 h 36 min',
+                  primaryColor: const Color(0xFFFF6E3A),
+                  size: 78,
+                  strokeWidth: 7,
+                  showPointer: false,
+                ),
+                RadialGlowGauge(
+                  percentage: claude.weeklyPct,
+                  centerText: '${claude.weeklyPct.toInt()}%',
+                  label: 'Claude · Weekly',
+                  subText: 'resets in 3 d 4 h',
+                  primaryColor: const Color(0xFFFF6E3A),
+                  size: 78,
+                  strokeWidth: 7,
+                  showPointer: false,
+                ),
+                RadialGlowGauge(
+                  percentage: claude.codexSessionPct,
+                  centerText: '${claude.codexSessionPct.toInt()}%',
+                  label: 'Codex · 5-hour',
+                  subText: 'resets in 4 h 6 min',
+                  primaryColor: Colors.white,
+                  size: 78,
+                  strokeWidth: 7,
+                  showPointer: false,
+                ),
+                RadialGlowGauge(
+                  percentage: stats.hasBattery ? stats.batteryPercent.toDouble() : 82.0,
+                  centerText: '${stats.hasBattery ? stats.batteryPercent : 82}%',
+                  label: 'PHONE',
+                  subText: '⚡ Charging · 30°C',
+                  primaryColor: const Color(0xFF22C55E),
+                  size: 78,
+                  strokeWidth: 7,
+                  showPointer: false,
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+
+        // Bottom 3 Panels: TOP CPU, Volume Capsule, Sessions List
+        Expanded(
+          flex: 52,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // TOP CPU List
+              Expanded(
+                flex: 38,
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10121A),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF1E212E), width: 1),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'TOP CPU (10%)',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                          color: Color(0xFFF472B6),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Expanded(
+                        child: ListView.builder(
+                          physics: const BouncingScrollPhysics(),
+                          itemCount: 4,
+                          itemBuilder: (ctx, i) {
+                            final p = processes[i];
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 2.5),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 14,
+                                    height: 14,
+                                    decoration: BoxDecoration(
+                                      color: p.avatarColor.withValues(alpha: 0.25),
+                                      borderRadius: BorderRadius.circular(3),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      p.avatarLetter,
+                                      style: TextStyle(
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w800,
+                                        color: p.avatarColor,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Expanded(
+                                    child: Text(
+                                      '${p.name} ×${p.count}',
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.white,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${p.cpuPct.toStringAsFixed(1)}%',
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+
+              // Volume Capsule Slider
+              Expanded(
+                flex: 18,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10121A),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF1E212E), width: 1),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      const Text(
+                        'VOLUME',
+                        style: TextStyle(
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.7,
+                          color: Colors.white54,
+                        ),
+                      ),
+                      Text(
+                        '${stats.volumeLevel}%',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              stats.isMuted
+                                  ? Icons.volume_off_rounded
+                                  : Icons.volume_mute_rounded,
+                              size: 14,
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            color: stats.isMuted ? Colors.red : Colors.white70,
+                            onPressed: () => conn.setMute(!stats.isMuted),
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: const Icon(Icons.remove_rounded, size: 14),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            color: Colors.white70,
+                            onPressed: () => conn.setVolume((stats.volumeLevel - 5).clamp(0, 100)),
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: const Icon(Icons.add_rounded, size: 14),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            color: Colors.white70,
+                            onPressed: () => conn.setVolume((stats.volumeLevel + 5).clamp(0, 100)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+
+              // Sessions Mini List
+              Expanded(
+                flex: 44,
+                child: AiSessionsCard(
+                  sessions: sessions,
+                  onPermissionResponse: (session, allow) {
+                    conn.respondToSessionPermission(session.id, allow);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Page 7: Docker & Storage Deck (Screenshot 9)
+  Widget _buildDockerStorageDeck(
+    ConnectionService conn,
+    dynamic stats,
+    dynamic sessions,
+    dynamic github,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Top: Docker & Free Disk cards + Radial Gauges
+        Expanded(
+          flex: 42,
+          child: Row(
+            children: [
+              const Expanded(
+                flex: 55,
+                child: DockerStorageCard(
+                  containerCount: 3,
+                  freeDisksCount: 4,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 45,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10121A),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF1E212E), width: 1),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      RadialGlowGauge(
+                        percentage: 31.0,
+                        centerText: '31%',
+                        label: 'CPU',
+                        primaryColor: const Color(0xFF00E5FF),
+                        size: 72,
+                        strokeWidth: 6.5,
+                        showPointer: false,
+                      ),
+                      const RadialGlowGauge(
+                        percentage: 33.0,
+                        centerText: '21.1 GB',
+                        label: 'RAM',
+                        primaryColor: Color(0xFFA855F7),
+                        size: 72,
+                        strokeWidth: 6.5,
+                        showPointer: false,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+
+        // Bottom: Sessions & GitHub side by side
+        Expanded(
+          flex: 58,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                flex: 50,
+                child: AiSessionsCard(
+                  sessions: sessions,
+                  onPermissionResponse: (session, allow) {
+                    conn.respondToSessionPermission(session.id, allow);
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 50,
+                child: GitHubCard(
+                  data: github,
+                  onOpenUrl: (url) => conn.openUrlOnPc(url),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }
 
-class _SmallAppIcon extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String tooltip;
-  final VoidCallback onTap;
+class _OverviewClockHeader extends StatefulWidget {
+  @override
+  State<_OverviewClockHeader> createState() => _OverviewClockHeaderState();
+}
 
-  const _SmallAppIcon({
-    required this.icon,
-    required this.color,
-    required this.tooltip,
-    required this.onTap,
-  });
+class _OverviewClockHeaderState extends State<_OverviewClockHeader> {
+  late Timer _timer;
+  DateTime _now = DateTime.now();
+
+  static const List<String> _weekdays = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday'
+  ];
+
+  static const List<String> _months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December'
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _now = DateTime.now());
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(6),
-          child: Container(
-            padding: const EdgeInsets.all(5),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: color.withValues(alpha: 0.3)),
+    final hourStr = _now.hour.toString().padLeft(2, '0');
+    final minStr = _now.minute.toString().padLeft(2, '0');
+    final secStr = _now.second.toString().padLeft(2, '0');
+    final weekdayStr = _weekdays[_now.weekday - 1];
+    final monthStr = _months[_now.month - 1];
+    final dateStr = '$weekdayStr ${_now.day} $monthStr';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$hourStr:$minStr',
+              style: const TextStyle(
+                fontSize: 38,
+                height: 1.0,
+                fontWeight: FontWeight.w200,
+                letterSpacing: -1.5,
+                color: Colors.white,
+              ),
             ),
-            child: Icon(icon, color: color, size: 14),
+            Padding(
+              padding: const EdgeInsets.only(top: 2, left: 3),
+              child: Text(
+                secStr,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                  color: Colors.white.withValues(alpha: 0.6),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          dateStr,
+          style: TextStyle(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w500,
+            color: Colors.white.withValues(alpha: 0.6),
           ),
         ),
-      ),
+      ],
     );
   }
 }
