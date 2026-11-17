@@ -28,38 +28,39 @@ class StatGaugeCard extends StatelessWidget {
 
     return GlassContainer(
       onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       borderColor: accentColor.withValues(alpha: 0.25),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.all(7),
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: accentColor.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, color: accentColor, size: 18),
+                child: Icon(icon, color: accentColor, size: 17),
               ),
               SizedBox(
-                width: 38,
-                height: 38,
+                width: 34,
+                height: 34,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
                     CircularProgressIndicator(
                       value: clampedProgress,
-                      strokeWidth: 3.5,
+                      strokeWidth: 3.2,
                       backgroundColor: Colors.white.withValues(alpha: 0.08),
                       valueColor: AlwaysStoppedAnimation<Color>(accentColor),
                     ),
                     Text(
                       '${(clampedProgress * 100).toInt()}%',
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 9.5,
                         fontWeight: FontWeight.w700,
                         color: accentColor,
                       ),
@@ -69,30 +70,36 @@ class StatGaugeCard extends StatelessWidget {
               ),
             ],
           ),
-          const Spacer(),
+          const SizedBox(height: 4),
           Text(
             title,
             style: const TextStyle(
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.w500,
               color: AppTheme.textSecondary,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 2),
-          Text(
-            valueText,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimary,
-              letterSpacing: -0.5,
+          const SizedBox(height: 1),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              valueText,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textPrimary,
+                letterSpacing: -0.5,
+              ),
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 1),
           Text(
             subText,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.w400,
               color: AppTheme.textMuted,
             ),
