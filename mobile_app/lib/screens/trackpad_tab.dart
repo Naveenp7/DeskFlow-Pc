@@ -74,9 +74,6 @@ class _TrackpadTabState extends State<TrackpadTab> {
                 Expanded(
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onPanDown: (details) {
-                      _lastPosition = details.localPosition;
-                    },
                     onPanUpdate: (details) {
                       final dx = (details.delta.dx * _sensitivity).round();
                       final dy = (details.delta.dy * _sensitivity).round();
