@@ -55,11 +55,21 @@ class DeskStatusHeader extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 6),
-                Text(
-                  'DeskFlow · ${hostname.toUpperCase()} · ${isConnected ? 'USB' : 'OFFLINE'}',
+                const Text(
+                  'DeskFlow',
                   style: TextStyle(
                     fontSize: 10,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '· ${hostname.toUpperCase()} · ${isConnected ? 'USB' : 'OFFLINE'}',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
                     letterSpacing: 0.5,
                     color: Colors.white.withValues(alpha: 0.75),
                   ),
