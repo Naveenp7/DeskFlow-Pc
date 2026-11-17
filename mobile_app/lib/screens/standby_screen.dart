@@ -30,80 +30,84 @@ class StandbyScreen extends StatelessWidget {
       backgroundColor: AppTheme.background,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           child: Column(
             children: [
               // Sleek Desk Top Status Bar
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(5),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [AppTheme.cyan, AppTheme.purple],
+                  Flexible(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [AppTheme.cyan, AppTheme.purple],
+                            ),
+                            borderRadius: BorderRadius.circular(6),
                           ),
-                          borderRadius: BorderRadius.circular(8),
+                          child: const Icon(
+                            Icons.hub_rounded,
+                            color: Colors.white,
+                            size: 13,
+                          ),
                         ),
-                        child: const Icon(
-                          Icons.hub_rounded,
-                          color: Colors.white,
-                          size: 14,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'DeskFlow',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.4,
-                          color: AppTheme.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppTheme.cyan.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Text(
-                          'STANDBY DECK',
+                        const SizedBox(width: 6),
+                        const Text(
+                          'DeskFlow',
                           style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.8,
-                            color: AppTheme.cyan,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.4,
+                            color: AppTheme.textPrimary,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: AppTheme.cyan.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'STANDBY DECK',
+                            style: TextStyle(
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.8,
+                              color: AppTheme.cyan,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       if (stats.hasBattery) ...[
                         Icon(
                           stats.isCharging
                               ? Icons.battery_charging_full_rounded
                               : Icons.battery_std_rounded,
-                          size: 14,
+                          size: 13,
                           color: stats.batteryPercent > 20
                               ? AppTheme.emerald
                               : AppTheme.rose,
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 3),
                         Text(
                           '${stats.batteryPercent}%',
                           style: const TextStyle(
-                            fontSize: 10,
+                            fontSize: 9.5,
                             fontWeight: FontWeight.w600,
                             color: AppTheme.textSecondary,
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                       ],
                       IconButton(
                         icon: const Icon(Icons.fullscreen_exit_rounded, size: 18),
@@ -117,7 +121,7 @@ class StandbyScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
 
               // Main 3-Column Desk Grid
               Expanded(
@@ -130,10 +134,10 @@ class StandbyScreen extends StatelessWidget {
                     Expanded(
                       flex: 32,
                       child: Container(
-                        padding: const EdgeInsets.all(10),
+                        padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: AppTheme.surfaceCard.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: AppTheme.border),
                         ),
                         child: Column(
@@ -149,34 +153,37 @@ class StandbyScreen extends StatelessWidget {
                               onConnectTap: () => _openDiscovery(context),
                             ),
 
-                            // Volume Slider & Mute
+                            // Volume Slider & Mute (Compact Mode)
                             VolumeControlWidget(
                               volumeLevel: stats.volumeLevel,
                               isMuted: stats.isMuted,
+                              compact: true,
                               onVolumeChanged: (val) => conn.setVolume(val),
                               onToggleMute: () => conn.setMute(!stats.isMuted),
                             ),
 
                             // Compact Media Control Bar
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: AppTheme.surfaceElevated,
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(10),
                                 border: Border.all(color: AppTheme.border),
                               ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                 children: [
                                   IconButton(
-                                    icon: const Icon(Icons.skip_previous_rounded, size: 18),
+                                    icon: const Icon(Icons.skip_previous_rounded, size: 16),
                                     color: AppTheme.textPrimary,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                     onPressed: () => conn.sendMediaAction('prev'),
                                     tooltip: 'Previous Track',
                                   ),
                                   Container(
-                                    width: 34,
-                                    height: 34,
+                                    width: 30,
+                                    height: 30,
                                     decoration: const BoxDecoration(
                                       shape: BoxShape.circle,
                                       gradient: LinearGradient(
@@ -184,7 +191,7 @@ class StandbyScreen extends StatelessWidget {
                                       ),
                                     ),
                                     child: IconButton(
-                                      icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                                      icon: const Icon(Icons.play_arrow_rounded, size: 18),
                                       color: Colors.white,
                                       padding: EdgeInsets.zero,
                                       onPressed: () => conn.sendMediaAction('play_pause'),
@@ -192,8 +199,10 @@ class StandbyScreen extends StatelessWidget {
                                     ),
                                   ),
                                   IconButton(
-                                    icon: const Icon(Icons.skip_next_rounded, size: 18),
+                                    icon: const Icon(Icons.skip_next_rounded, size: 16),
                                     color: AppTheme.textPrimary,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                     onPressed: () => conn.sendMediaAction('next'),
                                     tooltip: 'Next Track',
                                   ),
@@ -205,7 +214,7 @@ class StandbyScreen extends StatelessWidget {
                       ),
                     ),
 
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
 
                     // ==========================================
                     // COLUMN 2: HARDWARE TELEMETRY GAUGES
@@ -220,7 +229,7 @@ class StandbyScreen extends StatelessWidget {
                               crossAxisCount: 2,
                               crossAxisSpacing: 6,
                               mainAxisSpacing: 6,
-                              childAspectRatio: 1.5,
+                              childAspectRatio: 1.85,
                               physics: const NeverScrollableScrollPhysics(),
                               children: [
                                 AnimatedGauge(
@@ -261,9 +270,9 @@ class StandbyScreen extends StatelessWidget {
                             ),
                           ),
 
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
 
-                          // Quick Mode Utility Bar (Trackpad / Share / Exit Standby)
+                          // Quick Mode Utility Bar
                           Row(
                             children: [
                               Expanded(
@@ -273,7 +282,7 @@ class StandbyScreen extends StatelessWidget {
                                   onTap: onOpenTrackpad,
                                 ),
                               ),
-                              const SizedBox(width: 6),
+                              const SizedBox(width: 4),
                               Expanded(
                                 child: _UtilityPill(
                                   icon: Icons.share_rounded,
@@ -281,7 +290,7 @@ class StandbyScreen extends StatelessWidget {
                                   onTap: onOpenShare,
                                 ),
                               ),
-                              const SizedBox(width: 6),
+                              const SizedBox(width: 4),
                               Expanded(
                                 child: _UtilityPill(
                                   icon: Icons.screen_rotation_rounded,
@@ -295,7 +304,7 @@ class StandbyScreen extends StatelessWidget {
                       ),
                     ),
 
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
 
                     // ==========================================
                     // COLUMN 3: TACTILE ACTION DECK & LAUNCHERS
@@ -310,7 +319,7 @@ class StandbyScreen extends StatelessWidget {
                               crossAxisCount: 2,
                               crossAxisSpacing: 6,
                               mainAxisSpacing: 6,
-                              childAspectRatio: 1.35,
+                              childAspectRatio: 1.85,
                               physics: const NeverScrollableScrollPhysics(),
                               children: [
                                 TactileTile(
@@ -365,43 +374,49 @@ class StandbyScreen extends StatelessWidget {
                             ),
                           ),
 
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
 
                           // Quick App Launcher Bar
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              _SmallAppIcon(
-                                icon: Icons.code_rounded,
-                                color: const Color(0xFF007ACC),
-                                tooltip: 'VS Code',
-                                onTap: () => conn.launchApp('vscode'),
-                              ),
-                              _SmallAppIcon(
-                                icon: Icons.terminal_rounded,
-                                color: const Color(0xFF4E54C8),
-                                tooltip: 'Terminal',
-                                onTap: () => conn.launchApp('terminal'),
-                              ),
-                              _SmallAppIcon(
-                                icon: Icons.language_rounded,
-                                color: const Color(0xFF4285F4),
-                                tooltip: 'Browser',
-                                onTap: () => conn.launchApp('browser'),
-                              ),
-                              _SmallAppIcon(
-                                icon: Icons.album_rounded,
-                                color: const Color(0xFF1DB954),
-                                tooltip: 'Spotify',
-                                onTap: () => conn.launchApp('spotify'),
-                              ),
-                              _SmallAppIcon(
-                                icon: Icons.calculate_rounded,
-                                color: const Color(0xFFFF9900),
-                                tooltip: 'Calculator',
-                                onTap: () => conn.launchApp('calculator'),
-                              ),
-                            ],
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                _SmallAppIcon(
+                                  icon: Icons.code_rounded,
+                                  color: const Color(0xFF007ACC),
+                                  tooltip: 'VS Code',
+                                  onTap: () => conn.launchApp('vscode'),
+                                ),
+                                const SizedBox(width: 4),
+                                _SmallAppIcon(
+                                  icon: Icons.terminal_rounded,
+                                  color: const Color(0xFF4E54C8),
+                                  tooltip: 'Terminal',
+                                  onTap: () => conn.launchApp('terminal'),
+                                ),
+                                const SizedBox(width: 4),
+                                _SmallAppIcon(
+                                  icon: Icons.language_rounded,
+                                  color: const Color(0xFF4285F4),
+                                  tooltip: 'Browser',
+                                  onTap: () => conn.launchApp('browser'),
+                                ),
+                                const SizedBox(width: 4),
+                                _SmallAppIcon(
+                                  icon: Icons.album_rounded,
+                                  color: const Color(0xFF1DB954),
+                                  tooltip: 'Spotify',
+                                  onTap: () => conn.launchApp('spotify'),
+                                ),
+                                const SizedBox(width: 4),
+                                _SmallAppIcon(
+                                  icon: Icons.calculate_rounded,
+                                  color: const Color(0xFFFF9900),
+                                  tooltip: 'Calculator',
+                                  onTap: () => conn.launchApp('calculator'),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -441,25 +456,25 @@ class _UtilityPill extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 3),
           decoration: BoxDecoration(
             color: AppTheme.surfaceElevated,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(color: AppTheme.border),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 12, color: AppTheme.cyan),
-              const SizedBox(width: 3),
+              Icon(icon, size: 11, color: AppTheme.cyan),
+              const SizedBox(width: 2),
               Flexible(
                 child: Text(
                   label,
                   style: const TextStyle(
-                    fontSize: 9,
+                    fontSize: 8.5,
                     fontWeight: FontWeight.w600,
                     color: AppTheme.textPrimary,
                   ),
@@ -496,15 +511,15 @@ class _SmallAppIcon extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(6),
           child: Container(
-            padding: const EdgeInsets.all(6),
+            padding: const EdgeInsets.all(5),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
               border: Border.all(color: color.withValues(alpha: 0.3)),
             ),
-            child: Icon(icon, color: color, size: 16),
+            child: Icon(icon, color: color, size: 14),
           ),
         ),
       ),

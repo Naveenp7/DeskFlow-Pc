@@ -25,18 +25,18 @@ class AnimatedGauge extends StatelessWidget {
 
     return RepaintBoundary(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
           color: AppTheme.surfaceCard,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: accentColor.withValues(alpha: 0.22),
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.25),
-              blurRadius: 8,
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 6,
               offset: const Offset(0, 2),
             ),
           ],
@@ -50,47 +50,47 @@ class AnimatedGauge extends StatelessWidget {
               curve: Curves.easeOutCubic,
               builder: (context, animatedValue, _) {
                 return SizedBox(
-                  width: 44,
-                  height: 44,
+                  width: 34,
+                  height: 34,
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
                       CircularProgressIndicator(
                         value: animatedValue,
-                        strokeWidth: 4.0,
+                        strokeWidth: 3.2,
                         backgroundColor: Colors.white.withValues(alpha: 0.07),
                         valueColor: AlwaysStoppedAnimation<Color>(accentColor),
                       ),
-                      Icon(icon, size: 18, color: accentColor),
+                      Icon(icon, size: 15, color: accentColor),
                     ],
                   ),
                 );
               },
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 6),
 
             // Text column
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     label.toUpperCase(),
                     style: const TextStyle(
-                      fontSize: 10,
+                      fontSize: 9,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: 0.8,
+                      letterSpacing: 0.5,
                       color: AppTheme.textMuted,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 1),
                   Text(
                     valueText,
                     style: const TextStyle(
-                      fontSize: 15,
+                      fontSize: 13,
                       fontWeight: FontWeight.w700,
                       letterSpacing: -0.4,
                       color: AppTheme.textPrimary,
@@ -98,19 +98,17 @@ class AnimatedGauge extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (subText != null) ...[
-                    const SizedBox(height: 1),
+                  if (subText != null)
                     Text(
                       subText!,
                       style: const TextStyle(
-                        fontSize: 10,
+                        fontSize: 9,
                         fontWeight: FontWeight.w500,
                         color: AppTheme.textSecondary,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                  ],
                 ],
               ),
             ),

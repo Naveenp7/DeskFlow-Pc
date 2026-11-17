@@ -23,7 +23,10 @@ class VolumeControlWidget extends StatelessWidget {
     final effectiveVolume = isMuted ? 0 : volumeLevel;
 
     return GlassContainer(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 8 : 12,
+        vertical: compact ? 4 : 8,
+      ),
       borderColor: isMuted
           ? AppTheme.rose.withValues(alpha: 0.3)
           : AppTheme.cyan.withValues(alpha: 0.2),
@@ -36,7 +39,7 @@ class VolumeControlWidget extends StatelessWidget {
               GestureDetector(
                 onTap: onToggleMute,
                 child: Container(
-                  padding: const EdgeInsets.all(6),
+                  padding: const EdgeInsets.all(5),
                   decoration: BoxDecoration(
                     color: isMuted
                         ? AppTheme.rose.withValues(alpha: 0.2)
@@ -50,20 +53,20 @@ class VolumeControlWidget extends StatelessWidget {
                             ? Icons.volume_up_rounded
                             : Icons.volume_down_rounded,
                     color: isMuted ? AppTheme.rose : AppTheme.cyan,
-                    size: 16,
+                    size: compact ? 14 : 16,
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
+                    Text(
                       'Volume',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: compact ? 10 : 12,
                         fontWeight: FontWeight.w600,
                         color: AppTheme.textPrimary,
                       ),
@@ -73,48 +76,51 @@ class VolumeControlWidget extends StatelessWidget {
                     Text(
                       isMuted ? 'Muted' : '$effectiveVolume%',
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: compact ? 9 : 10,
                         fontWeight: FontWeight.w500,
                         color: isMuted ? AppTheme.rose : AppTheme.cyan,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-              InkWell(
-                onTap: () {
-                  final next = (volumeLevel - 5).clamp(0, 100);
-                  onVolumeChanged(next);
-                },
-                borderRadius: BorderRadius.circular(6),
-                child: const Padding(
-                  padding: EdgeInsets.all(4),
-                  child: Icon(Icons.remove_rounded, size: 16, color: AppTheme.textSecondary),
+              if (!compact) ...[
+                InkWell(
+                  onTap: () {
+                    final next = (volumeLevel - 5).clamp(0, 100);
+                    onVolumeChanged(next);
+                  },
+                  borderRadius: BorderRadius.circular(6),
+                  child: const Padding(
+                    padding: EdgeInsets.all(3),
+                    child: Icon(Icons.remove_rounded, size: 14, color: AppTheme.textSecondary),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 2),
-              InkWell(
-                onTap: () {
-                  final next = (volumeLevel + 5).clamp(0, 100);
-                  onVolumeChanged(next);
-                },
-                borderRadius: BorderRadius.circular(6),
-                child: const Padding(
-                  padding: EdgeInsets.all(4),
-                  child: Icon(Icons.add_rounded, size: 16, color: AppTheme.textSecondary),
+                InkWell(
+                  onTap: () {
+                    final next = (volumeLevel + 5).clamp(0, 100);
+                    onVolumeChanged(next);
+                  },
+                  borderRadius: BorderRadius.circular(6),
+                  child: const Padding(
+                    padding: EdgeInsets.all(3),
+                    child: Icon(Icons.add_rounded, size: 14, color: AppTheme.textSecondary),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: compact ? 1 : 4),
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
-              trackHeight: 4,
+              trackHeight: compact ? 3 : 4,
               activeTrackColor: isMuted ? AppTheme.rose : AppTheme.cyan,
               inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
               thumbColor: isMuted ? AppTheme.rose : AppTheme.cyan,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+              thumbShape: RoundSliderThumbShape(enabledThumbRadius: compact ? 4 : 6),
+              overlayShape: RoundSliderOverlayShape(overlayRadius: compact ? 8 : 12),
               overlayColor: AppTheme.cyan.withValues(alpha: 0.2),
             ),
             child: Slider(
