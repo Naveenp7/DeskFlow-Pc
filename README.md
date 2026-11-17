@@ -1,6 +1,6 @@
 # ⚡ DeskFlow — Cyberpunk OLED Desk Deck & PC Companion
 
-> Turn your phone or tablet into an ultra-high-density, aesthetic hardware monitor, AI coding control deck, and productivity companion. Inspired by [PhoneBox](https://github.com/ersinkoc/phonebox), rebuilt with native **Flutter** and zero-idle-CPU Python for an OLED-optimized, buttery-smooth experience.
+> Turn your phone or tablet into an ultra-high-density, aesthetic hardware monitor, AI coding control deck, and productivity companion. Built with native **Flutter** and zero-idle-CPU Python for an OLED-optimized, buttery-smooth experience.
 
 ---
 

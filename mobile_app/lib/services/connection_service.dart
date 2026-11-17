@@ -29,7 +29,7 @@ class ConnectionService extends ChangeNotifier {
   String? _clipboardContent;
   String? _bannerNotification;
 
-  // New PhoneBox-Style Features & State
+  // Extended Desk Deck Features & State
   ClaudeQuota _claudeQuota = ClaudeQuota.mock();
   final List<AiSessionItem> _aiSessions = List.from(AiSessionItem.defaultList());
   final GitHubWorkspaceData _githubData = GitHubWorkspaceData.mock();
