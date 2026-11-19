@@ -5,15 +5,21 @@ Provides UDP Auto-Discovery and WebSocket control & telemetry.
 """
 
 import asyncio
+import glob
 import json
 import os
 import platform
 import socket
+import subprocess
 import sys
 import time
+import urllib.request
+import urllib.error
 import webbrowser
 import ctypes
 from ctypes import wintypes
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
 
 # System performance and hardware monitoring
 import psutil
@@ -42,6 +48,49 @@ DISCOVERY_PORT = 41532
 WS_PORT = 41533
 APP_NAME = "DeskFlow"
 VERSION = "1.0.0"
+
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+
+DEFAULT_CONFIG = {
+    # Personal GitHub token (classic PAT with "repo" + "notifications" read scope,
+    # or a fine-grained token with Pull requests: Read). Leave blank to disable
+    # the GitHub card. Create one at https://github.com/settings/tokens
+    "github_token": "",
+    # Optional: only needed if the token's username can't be auto-detected.
+    "github_username": "",
+    # Local, best-effort Claude Code usage tracker. This reads *your own* local
+    # ~/.claude session logs on this PC -- it is a local estimate, not an
+    # official Anthropic quota API (no such public API exists), so the
+    # token budgets below are a rough reference you can tune to your plan.
+    "claude_tier_label": "Local estimate",
+    "claude_session_token_budget": 150000,
+    "claude_weekly_token_budget": 800000,
+    # Weather: leave lat/lon blank to auto-locate from this PC's public IP
+    # (via ip-api.com, free, no key). Set them to skip that lookup.
+    "weather_lat": None,
+    "weather_lon": None,
+    "weather_city": None,
+}
+
+
+def load_config():
+    """Loads config.json next to this script, creating it with defaults on first run."""
+    cfg = dict(DEFAULT_CONFIG)
+    try:
+        if os.path.exists(CONFIG_PATH):
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                user_cfg = json.load(f)
+            cfg.update({k: v for k, v in user_cfg.items() if k in DEFAULT_CONFIG})
+        else:
+            with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+                json.dump(DEFAULT_CONFIG, f, indent=2)
+            print(f"[Config] Created {CONFIG_PATH} -- add your GitHub token there to enable the GitHub card.")
+    except Exception as e:
+        print(f"[Config Error] {e}")
+    return cfg
+
+
+CONFIG = load_config()
 
 # Win32 Virtual Key Constants
 VK_MEDIA_NEXT_TRACK = 0xB0
@@ -217,6 +266,508 @@ def set_clipboard_text(text: str):
 _last_net_bytes = None
 _last_net_time = None
 
+# Cached GPU availability probe (nvidia-smi is only queried if it exists)
+_nvidia_smi_checked = False
+_nvidia_smi_available = False
+
+
+def _has_nvidia_smi():
+    global _nvidia_smi_checked, _nvidia_smi_available
+    if not _nvidia_smi_checked:
+        _nvidia_smi_checked = True
+        try:
+            subprocess.run(
+                ["nvidia-smi", "-L"],
+                capture_output=True, timeout=2,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+            )
+            _nvidia_smi_available = True
+        except Exception:
+            _nvidia_smi_available = False
+    return _nvidia_smi_available
+
+
+def get_gpu_stats():
+    """Real NVIDIA GPU stats via nvidia-smi (no extra Python dependency).
+    Returns None if no NVIDIA GPU / driver is present -- never fabricated."""
+    if not _has_nvidia_smi():
+        return None
+    try:
+        out = subprocess.run(
+            ["nvidia-smi",
+             "--query-gpu=name,utilization.gpu,temperature.gpu,memory.used,memory.total,power.draw",
+             "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=2,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+        )
+        line = out.stdout.strip().splitlines()[0]
+        name, util, temp, mem_used, mem_total, power = [p.strip() for p in line.split(",")]
+        return {
+            "name": name,
+            "percent": float(util),
+            "temp_c": float(temp),
+            "vram_used_gb": round(float(mem_used) / 1024, 1),
+            "vram_total_gb": round(float(mem_total) / 1024, 1),
+            "power_w": float(power) if power not in ("", "N/A") else 0.0,
+        }
+    except Exception:
+        return None
+
+
+def get_disks():
+    """Real usage for every fixed local drive (no fabricated C:/D:/E: splits)."""
+    disks = []
+    try:
+        for part in psutil.disk_partitions(all=False):
+            if os.name == "nt" and "fixed" not in part.opts and "cdrom" in part.opts:
+                continue
+            try:
+                usage = psutil.disk_usage(part.mountpoint)
+            except Exception:
+                continue
+            label = part.mountpoint.rstrip("\\/")
+            disks.append({
+                "label": label,
+                "percent": usage.percent,
+                "used_gb": round(usage.used / (1024**3), 1),
+                "total_gb": round(usage.total / (1024**3), 1),
+            })
+    except Exception:
+        pass
+    return disks
+
+
+# Per-process CPU% needs one primed call before it returns real deltas.
+_process_cpu_primed = False
+
+
+def get_processes_snapshot(limit=24):
+    """Real running-process snapshot aggregated by executable name."""
+    global _process_cpu_primed
+    try:
+        procs = list(psutil.process_iter(['name', 'cpu_percent', 'memory_info']))
+        if not _process_cpu_primed:
+            # First pass only seeds the internal cpu_percent baseline.
+            for p in procs:
+                try:
+                    p.cpu_percent(interval=None)
+                except Exception:
+                    pass
+            _process_cpu_primed = True
+            return []
+
+        aggregated = {}
+        for p in procs:
+            try:
+                info = p.info
+                name = (info.get('name') or 'Unknown').replace('.exe', '')
+                cpu = p.cpu_percent(interval=None) / (psutil.cpu_count(logical=True) or 1)
+                mem = (info.get('memory_info').rss if info.get('memory_info') else 0) / (1024 * 1024)
+                if name not in aggregated:
+                    aggregated[name] = {"name": name, "count": 0, "cpu_pct": 0.0, "ram_mb": 0.0}
+                aggregated[name]["count"] += 1
+                aggregated[name]["cpu_pct"] += cpu
+                aggregated[name]["ram_mb"] += mem
+            except (psutil.NoSuchProcess, psutil.AccessDenied, Exception):
+                continue
+
+        items = sorted(aggregated.values(), key=lambda x: x["cpu_pct"], reverse=True)
+        return items[:limit]
+    except Exception:
+        return []
+
+
+def get_docker_storage():
+    """Real disk count + real `docker ps` count (if Docker Desktop is installed)."""
+    disks = get_disks()
+    container_count = None
+    try:
+        out = subprocess.run(
+            ["docker", "ps", "-q"],
+            capture_output=True, text=True, timeout=2,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+        )
+        if out.returncode == 0:
+            container_count = len([l for l in out.stdout.splitlines() if l.strip()])
+    except Exception:
+        container_count = None
+    return {
+        "type": "docker",
+        "docker_available": container_count is not None,
+        "container_count": container_count or 0,
+        "free_disks_count": len(disks),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Claude Code local usage tracker.
+#
+# Reads this machine's own ~/.claude/projects/**/*.jsonl session transcripts
+# (the same files Claude Code itself writes) to compute REAL token usage in
+# rolling 5-hour and 7-day windows. There is no public Anthropic API for the
+# consumer "5-hour session" / "weekly" quota percentages shown in the Claude
+# apps, so the percentages here are this machine's real token burn measured
+# against a configurable budget (see config.json) -- labelled as a local
+# estimate rather than an official number.
+# ---------------------------------------------------------------------------
+
+def _claude_projects_dir():
+    return os.path.join(os.path.expanduser("~"), ".claude", "projects")
+
+
+def _iter_recent_claude_jsonl(max_age_days=8):
+    root = _claude_projects_dir()
+    if not os.path.isdir(root):
+        return
+    cutoff = time.time() - max_age_days * 86400
+    for path in glob.glob(os.path.join(root, "**", "*.jsonl"), recursive=True):
+        try:
+            if os.path.getmtime(path) >= cutoff:
+                yield path
+        except OSError:
+            continue
+
+
+def _parse_claude_timestamp(entry):
+    ts = entry.get("timestamp")
+    if not ts:
+        return None
+    try:
+        return datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def get_claude_usage(config):
+    """Sums real local Claude Code token usage over the last 5h and 7d."""
+    now = datetime.now(timezone.utc)
+    session_cutoff = now - timedelta(hours=5)
+    weekly_cutoff = now - timedelta(days=7)
+    hour_cutoff = now - timedelta(hours=1)
+
+    session_tokens = 0
+    weekly_tokens = 0
+    last_hour_tokens = 0
+    last_event_at = None
+
+    for path in _iter_recent_claude_jsonl():
+        try:
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                    except Exception:
+                        continue
+                    usage = None
+                    msg = entry.get("message")
+                    if isinstance(msg, dict):
+                        usage = msg.get("usage")
+                    if usage is None:
+                        usage = entry.get("usage")
+                    if not isinstance(usage, dict):
+                        continue
+                    ts = _parse_claude_timestamp(entry)
+                    if ts is None or ts < weekly_cutoff:
+                        continue
+                    # Cache-read tokens are re-sent context (billed at a steep
+                    # discount) and can dwarf real usage by 100-1000x, so they
+                    # are excluded here -- input+output is what actually
+                    # tracks with a "how much have I used" feeling.
+                    tokens = (
+                        int(usage.get("input_tokens") or 0)
+                        + int(usage.get("output_tokens") or 0)
+                    )
+                    weekly_tokens += tokens
+                    if ts >= session_cutoff:
+                        session_tokens += tokens
+                    if ts >= hour_cutoff:
+                        last_hour_tokens += tokens
+                    if last_event_at is None or ts > last_event_at:
+                        last_event_at = ts
+        except Exception:
+            continue
+
+    session_budget = max(1, int(config.get("claude_session_token_budget", 300000)))
+    weekly_budget = max(1, int(config.get("claude_weekly_token_budget", 2000000)))
+
+    session_pct = min(100.0, round(session_tokens / session_budget * 100, 1))
+    weekly_pct = min(100.0, round(weekly_tokens / weekly_budget * 100, 1))
+
+    def fmt_tokens(n):
+        if n >= 1_000_000:
+            return f"{n / 1_000_000:.1f}M"
+        if n >= 1_000:
+            return f"{n / 1_000:.0f}K"
+        return str(n)
+
+    session_reset_at = (last_event_at or now) + timedelta(hours=5)
+    minutes_left = max(0, int((session_reset_at - now).total_seconds() // 60))
+
+    return {
+        "type": "claude",
+        "session_pct": session_pct,
+        "session_reset": f"resets in {minutes_left // 60}h {minutes_left % 60}m" if last_event_at else "no recent activity",
+        "session_status": "Plenty left" if session_pct < 70 else ("On pace" if session_pct < 90 else "Almost out"),
+        "weekly_pct": weekly_pct,
+        "weekly_reset": "rolling 7-day window",
+        "weekly_status": "On pace" if weekly_pct < 90 else "Almost out",
+        "weekly_fable_pct": 0.0,
+        "weekly_fable_reset": "n/a",
+        "weekly_fable_status": "Not tracked",
+        "codex_session_pct": 0.0,
+        "codex_reset": "Not tracked",
+        "last_updated": "just now",
+        "tier": config.get("claude_tier_label", "Local estimate"),
+        "tokens_used": fmt_tokens(session_tokens),
+        "tokens_total": fmt_tokens(session_budget),
+        "burn_rate": f"{fmt_tokens(last_hour_tokens)} / hr",
+    }
+
+
+def get_claude_sessions(limit=10):
+    """Real recently-active Claude Code project sessions on this machine,
+    derived from actual local transcript activity (no fabricated statuses)."""
+    root = _claude_projects_dir()
+    sessions = []
+    if not os.path.isdir(root):
+        return sessions
+    now = time.time()
+    try:
+        for entry in os.scandir(root):
+            if not entry.is_dir():
+                continue
+            try:
+                jsonl_files = glob.glob(os.path.join(entry.path, "*.jsonl"))
+                if not jsonl_files:
+                    continue
+                newest = max(jsonl_files, key=os.path.getmtime)
+                mtime = os.path.getmtime(newest)
+            except Exception:
+                continue
+            age = now - mtime
+            if age > 6 * 3600:
+                continue  # not active today; skip rather than show stale fake state
+            name = entry.name
+            # Claude Code sanitizes the project path into the folder name
+            # ("C--Users-you-project" style) -- show just the last segment.
+            display_name = name.strip("-").split("-")[-1] or name
+            status = "working" if age < 20 else "idle"
+            minutes = int(age // 60)
+            duration = f"{minutes}m ago" if minutes > 0 else "just now"
+            sessions.append({
+                "id": name,
+                "name": display_name,
+                "provider": "claude",
+                "status": status,
+                "status_text": "Working" if status == "working" else "Idle",
+                "duration": duration,
+            })
+    except Exception:
+        pass
+    sessions.sort(key=lambda s: s["duration"])
+    return sessions[:limit]
+
+
+# ---------------------------------------------------------------------------
+# GitHub -- real data via the user's own personal access token (config.json).
+# ---------------------------------------------------------------------------
+
+_github_username_cache = None
+
+
+def _github_api(path, token):
+    req = urllib.request.Request(
+        f"https://api.github.com{path}",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "DeskFlow-PC-Companion",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=4) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def get_github_data(config):
+    token = (config.get("github_token") or "").strip()
+    if not token:
+        return {
+            "type": "github",
+            "configured": False,
+            "username": "",
+            "notification_count": 0,
+            "review_requests": [],
+            "pull_requests": [],
+        }
+
+    global _github_username_cache
+    try:
+        username = (config.get("github_username") or "").strip()
+        if not username:
+            if _github_username_cache is None:
+                _github_username_cache = _github_api("/user", token).get("login", "")
+            username = _github_username_cache
+
+        notifications = _github_api("/notifications", token)
+        unread_count = sum(1 for n in notifications if not n.get("unread") is False)
+
+        review_q = urllib.parse.quote(f"is:open is:pr review-requested:{username}")
+        review_results = _github_api(f"/search/issues?q={review_q}", token)
+        review_requests = [
+            {
+                "repo": item["repository_url"].split("/")[-1],
+                "number": item["number"],
+                "title": item["title"],
+                "url": item["html_url"],
+            }
+            for item in review_results.get("items", [])[:6]
+        ]
+
+        pr_q = urllib.parse.quote(f"is:open is:pr author:{username}")
+        pr_results = _github_api(f"/search/issues?q={pr_q}", token)
+        pull_requests = []
+        for item in pr_results.get("items", [])[:6]:
+            repo_full = item["repository_url"].split("/repos/")[-1]
+            number = item["number"]
+            draft = item.get("draft", False)
+            status, label = "inReview", "in review"
+            if draft:
+                status, label = "draft", ""
+            else:
+                # Real review decision (approved / changes requested), not guessed.
+                try:
+                    reviews = _github_api(f"/repos/{repo_full}/pulls/{number}/reviews", token)
+                    latest_by_user = {}
+                    for rev in reviews:
+                        user = rev.get("user", {}).get("login", "")
+                        latest_by_user[user] = rev.get("state", "")
+                    states = set(latest_by_user.values())
+                    if "CHANGES_REQUESTED" in states:
+                        status, label = "changes", "changes"
+                    elif "APPROVED" in states:
+                        status, label = "approved", "approved"
+                except Exception:
+                    pass
+            pull_requests.append({
+                "repo": repo_full.split("/")[-1],
+                "number": number,
+                "title": item["title"],
+                "status": status,
+                "status_label": label,
+                "url": item["html_url"],
+            })
+
+        return {
+            "type": "github",
+            "configured": True,
+            "username": f"@{username}",
+            "notification_count": unread_count,
+            "review_requests": review_requests,
+            "pull_requests": pull_requests,
+        }
+    except Exception as e:
+        print(f"[GitHub Error] {e}")
+        return {
+            "type": "github",
+            "configured": True,
+            "error": True,
+            "username": "",
+            "notification_count": 0,
+            "review_requests": [],
+            "pull_requests": [],
+        }
+
+
+# ---------------------------------------------------------------------------
+# Weather -- real data via Open-Meteo (free, no API key) + IP geolocation.
+# ---------------------------------------------------------------------------
+
+_weather_location_cache = None
+
+
+def _locate_by_ip():
+    global _weather_location_cache
+    if _weather_location_cache:
+        return _weather_location_cache
+    try:
+        req = urllib.request.Request(
+            "http://ip-api.com/json/?fields=status,lat,lon,city",
+            headers={"User-Agent": "DeskFlow-PC-Companion"},
+        )
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        if data.get("status") == "success":
+            _weather_location_cache = (data["lat"], data["lon"], data.get("city", ""))
+            return _weather_location_cache
+    except Exception:
+        pass
+    return None
+
+
+_WEATHER_CODE_ICON = {
+    0: "sunny", 1: "sunny", 2: "cloudy", 3: "cloudy",
+    45: "fog", 48: "fog",
+    51: "rain", 53: "rain", 55: "rain", 61: "rain", 63: "rain", 65: "rain",
+    71: "snow", 73: "snow", 75: "snow",
+    80: "rain", 81: "rain", 82: "rain",
+    95: "storm", 96: "storm", 99: "storm",
+}
+
+
+def get_weather(config):
+    try:
+        lat, lon, city = config.get("weather_lat"), config.get("weather_lon"), config.get("weather_city")
+        if lat is None or lon is None:
+            located = _locate_by_ip()
+            if located is None:
+                return {"type": "weather", "available": False}
+            lat, lon, auto_city = located
+            city = city or auto_city
+
+        url = (
+            "https://api.open-meteo.com/v1/forecast"
+            f"?latitude={lat}&longitude={lon}"
+            "&current=temperature_2m,apparent_temperature,weather_code"
+            "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"
+            "&timezone=auto&forecast_days=7"
+        )
+        req = urllib.request.Request(url, headers={"User-Agent": "DeskFlow-PC-Companion"})
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+
+        current = data.get("current", {})
+        daily = data.get("daily", {})
+        days = daily.get("time", [])
+        forecast = []
+        for i, day in enumerate(days[:7]):
+            code = daily.get("weather_code", [0] * 7)[i]
+            forecast.append({
+                "day": day,
+                "icon": _WEATHER_CODE_ICON.get(code, "cloudy"),
+                "max_temp": round(daily.get("temperature_2m_max", [0] * 7)[i]),
+                "min_temp": round(daily.get("temperature_2m_min", [0] * 7)[i]),
+                "rain_pct": daily.get("precipitation_probability_max", [0] * 7)[i] or 0,
+            })
+
+        return {
+            "type": "weather",
+            "available": True,
+            "city": city or "Current location",
+            "temp": round(current.get("temperature_2m", 0)),
+            "feels_like": round(current.get("apparent_temperature", 0)),
+            "condition": _WEATHER_CODE_ICON.get(current.get("weather_code", 0), "cloudy"),
+            "max_temp": forecast[0]["max_temp"] if forecast else 0,
+            "min_temp": forecast[0]["min_temp"] if forecast else 0,
+            "forecast": forecast,
+        }
+    except Exception as e:
+        print(f"[Weather Error] {e}")
+        return {"type": "weather", "available": False}
+
+
 def get_system_telemetry():
     """Collects system stats. Runs in <0.5ms with near-zero CPU usage."""
     global _last_net_bytes, _last_net_time
@@ -238,6 +789,9 @@ def get_system_telemetry():
         disk_pct = disk.percent
     except Exception:
         disk_used_gb, disk_total_gb, disk_pct = 0, 0, 0
+
+    disks = get_disks()
+    gpu = get_gpu_stats()
 
     # Battery
     battery_info = {"has_battery": False, "percent": 100, "is_charging": True}
@@ -300,6 +854,8 @@ def get_system_telemetry():
             "total_gb": disk_total_gb,
             "percent": disk_pct
         },
+        "disks": disks,
+        "gpu": gpu,
         "battery": battery_info,
         "network": {
             "up_kbps": up_kbps,
@@ -321,6 +877,7 @@ class DeskFlowServer:
         self.hostname = platform.node()
         self.local_ip = get_local_ip()
         self.stats_task = None
+        self.slow_stats_task = None
         self.running = True
 
     async def broadcast_loop(self):
@@ -402,6 +959,43 @@ class DeskFlowServer:
         print("[Telemetry] No clients connected. Stats stream paused (0% CPU).")
         self.stats_task = None
 
+    async def broadcast(self, payload: dict):
+        if not self.connected_clients:
+            return
+        msg = json.dumps(payload)
+        dead_clients = set()
+        for ws in self.connected_clients:
+            try:
+                await ws.send(msg)
+            except Exception:
+                dead_clients.add(ws)
+        self.connected_clients.difference_update(dead_clients)
+
+    async def slow_telemetry_loop(self):
+        """Lower-frequency real data: processes, Claude usage, sessions,
+        GitHub, weather, Docker/disks. Runs while clients are connected."""
+        print("[Telemetry] Slow data stream started (processes/claude/github/weather).")
+        tick = 0
+        while self.running and len(self.connected_clients) > 0:
+            try:
+                await self.broadcast({"type": "processes", "items": get_processes_snapshot()})
+                await self.broadcast(get_claude_usage(CONFIG))
+                await self.broadcast({"type": "sessions", "items": get_claude_sessions()})
+                await self.broadcast(get_docker_storage())
+
+                # GitHub + weather change slowly and hit the network, so they
+                # only refresh every ~3rd tick (~36s) to stay light-weight.
+                if tick % 3 == 0:
+                    await self.broadcast(get_github_data(CONFIG))
+                    await self.broadcast(get_weather(CONFIG))
+            except Exception as e:
+                print(f"[Slow Telemetry Error] {e}")
+            tick += 1
+            await asyncio.sleep(12.0)
+
+        print("[Telemetry] No clients connected. Slow data stream paused.")
+        self.slow_stats_task = None
+
     async def handle_client(self, websocket):
         client_id = f"{websocket.remote_address[0]}:{websocket.remote_address[1]}"
         print(f"[Client Connected] {client_id}")
@@ -414,9 +1008,11 @@ class DeskFlowServer:
         except Exception:
             pass
 
-        # Ensure telemetry streaming loop is active
+        # Ensure telemetry streaming loops are active
         if self.stats_task is None or self.stats_task.done():
             self.stats_task = asyncio.create_task(self.telemetry_loop())
+        if getattr(self, "slow_stats_task", None) is None or self.slow_stats_task.done():
+            self.slow_stats_task = asyncio.create_task(self.slow_telemetry_loop())
 
         try:
             async for raw_msg in websocket:
@@ -530,6 +1126,19 @@ class DeskFlowServer:
                 "type": "notify",
                 "message": f"Terminated {killed_count} instances of {payload.get('name')}"
             }))
+
+        # --- MANUAL REFRESH REQUESTS (pull-to-refresh on the phone) ---
+        elif action_type == "get_claude_quota":
+            await ws.send(json.dumps(get_claude_usage(CONFIG)))
+
+        elif action_type == "get_github":
+            await ws.send(json.dumps(get_github_data(CONFIG)))
+
+        elif action_type == "get_processes":
+            await ws.send(json.dumps({"type": "processes", "items": get_processes_snapshot()}))
+
+        elif action_type == "get_weather":
+            await ws.send(json.dumps(get_weather(CONFIG)))
 
         # --- UNIVERSAL CLIPBOARD & SHARE ---
         elif action_type == "clipboard_send":

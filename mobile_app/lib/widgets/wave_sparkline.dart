@@ -52,10 +52,10 @@ class _WaveSparklineCardState extends State<WaveSparklineCard>
       onTap: widget.onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF12141E),
+          color: const Color(0xFF15151B),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: const Color(0xFF1E2232),
+            color: const Color(0xFF26262E),
             width: 1,
           ),
         ),
@@ -188,7 +188,7 @@ class _WavePainter extends CustomPainter {
         width: w,
         height: h,
         phase: phase * 1.4 + 1.0,
-        color: secondaryColor ?? const Color(0xFF00E5FF),
+        color: secondaryColor ?? const Color(0xFF0A84FF),
         hasFill: false,
         amplitude: h * 0.22,
         frequency: 5.0,

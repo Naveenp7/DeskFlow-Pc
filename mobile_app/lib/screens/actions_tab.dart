@@ -154,7 +154,7 @@ class ActionsTab extends StatelessWidget {
               _AppLaunchTile(
                 name: 'Notepad',
                 icon: Icons.edit_note_rounded,
-                color: const Color(0xFF10B981),
+                color: const Color(0xFF30D158),
                 onTap: () => conn.launchApp('notepad'),
               ),
             ],

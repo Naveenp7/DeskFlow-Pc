@@ -14,7 +14,7 @@ class ClaudeQuotaView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const claudeOrange = Color(0xFFFF6E3A);
+    const claudeOrange = Color(0xFFFF9F0A);
     const claudeOrangeEnd = Color(0xFFFF9466);
     const badgeBg = Color(0xFF332018);
     const badgeText = Color(0xFFFF9055);
@@ -22,10 +22,10 @@ class ClaudeQuotaView extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF101118),
+        color: const Color(0xFF15151B),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: const Color(0xFF1E212E),
+          color: const Color(0xFF26262E),
           width: 1,
         ),
       ),
@@ -111,7 +111,7 @@ class ClaudeQuotaView extends StatelessWidget {
                   label: '5-hour session',
                   subText: quota.sessionReset,
                   statusText: quota.sessionStatus,
-                  statusColor: const Color(0xFF10B981),
+                  statusColor: const Color(0xFF30D158),
                   primaryColor: claudeOrange,
                   secondaryColor: claudeOrangeEnd,
                   size: 116,
@@ -143,7 +143,7 @@ class ClaudeQuotaView extends StatelessWidget {
                   label: 'Weekly · Fable',
                   subText: quota.weeklyFableReset,
                   statusText: quota.weeklyFableStatus,
-                  statusColor: const Color(0xFF10B981),
+                  statusColor: const Color(0xFF30D158),
                   primaryColor: claudeOrange,
                   secondaryColor: claudeOrangeEnd,
                   size: 116,
@@ -181,7 +181,7 @@ class ClaudeQuotaView extends StatelessWidget {
                 _StatDetail(
                   label: 'Codex Session',
                   value: '${quota.codexSessionPct.toInt()}% left',
-                  color: const Color(0xFF00E5FF),
+                  color: const Color(0xFF0A84FF),
                 ),
               ],
             ),

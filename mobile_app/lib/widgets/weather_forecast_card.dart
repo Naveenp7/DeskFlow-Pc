@@ -117,9 +117,9 @@ class _WeatherForecastCardState extends State<WeatherForecastCard> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFF12141E),
+            color: const Color(0xFF15151B),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF1E212E), width: 1),
+            border: Border.all(color: const Color(0xFF26262E), width: 1),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -137,7 +137,7 @@ class _WeatherForecastCardState extends State<WeatherForecastCard> {
                     ),
                   ),
                   Text(
-                    widget.weather.city,
+                    widget.weather.available ? widget.weather.city : '--',
                     style: TextStyle(
                       fontSize: 9.5,
                       fontWeight: FontWeight.w500,
@@ -148,6 +148,21 @@ class _WeatherForecastCardState extends State<WeatherForecastCard> {
               ),
               const SizedBox(height: 10),
 
+              if (!widget.weather.available)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  child: Center(
+                    child: Text(
+                      'Weather unavailable right now.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withValues(alpha: 0.35),
+                      ),
+                    ),
+                  ),
+                )
+              else
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: widget.weather.forecast.map((day) {
@@ -183,7 +198,7 @@ class _WeatherForecastCardState extends State<WeatherForecastCard> {
                           const Icon(
                             Icons.water_drop_rounded,
                             size: 9,
-                            color: Color(0xFF38BDF8),
+                            color: Color(0xFF64D2FF),
                           ),
                           const SizedBox(width: 2),
                           Text(
@@ -191,7 +206,7 @@ class _WeatherForecastCardState extends State<WeatherForecastCard> {
                             style: const TextStyle(
                               fontSize: 9,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF38BDF8),
+                              color: Color(0xFF64D2FF),
                             ),
                           ),
                         ],

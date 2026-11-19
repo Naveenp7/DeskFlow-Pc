@@ -29,13 +29,16 @@ class ConnectionService extends ChangeNotifier {
   String? _clipboardContent;
   String? _bannerNotification;
 
-  // Extended Desk Deck Features & State
-  ClaudeQuota _claudeQuota = ClaudeQuota.mock();
-  final List<AiSessionItem> _aiSessions = List.from(AiSessionItem.defaultList());
-  final GitHubWorkspaceData _githubData = GitHubWorkspaceData.mock();
-  final List<SystemProcessItem> _processes = List.from(SystemProcessItem.defaultList());
-  final WeatherData _weather = WeatherData.mock();
-  MediaTrackInfo _mediaTrack = MediaTrackInfo.mock();
+  // Extended Desk Deck Features & State -- all neutral/empty until the PC
+  // companion sends real data over the WebSocket.
+  ClaudeQuota _claudeQuota = ClaudeQuota.initial();
+  List<AiSessionItem> _aiSessions = [];
+  GitHubWorkspaceData _githubData = GitHubWorkspaceData.initial();
+  List<SystemProcessItem> _processes = [];
+  WeatherData _weather = WeatherData.initial();
+  bool _dockerAvailable = false;
+  int _containerCount = 0;
+  int _freeDisksCount = 0;
 
   Timer? _reconnectTimer;
   final bool _autoReconnect = true;
@@ -54,7 +57,9 @@ class ConnectionService extends ChangeNotifier {
   GitHubWorkspaceData get githubData => _githubData;
   List<SystemProcessItem> get processes => _processes;
   WeatherData get weather => _weather;
-  MediaTrackInfo get mediaTrack => _mediaTrack;
+  bool get dockerAvailable => _dockerAvailable;
+  int get containerCount => _containerCount;
+  int get freeDisksCount => _freeDisksCount;
 
   ConnectionService() {
     _loadLastDeviceAndConnect();
@@ -125,55 +130,100 @@ class ConnectionService extends ChangeNotifier {
       final json = jsonDecode(message as String) as Map<String, dynamic>;
       final type = json['type'] as String?;
 
-      if (type == 'stats') {
-        _stats = SystemStats.fromJson(json);
-        final sentTime = json['timestamp'] as num?;
-        if (sentTime != null) {
-          final now = DateTime.now().millisecondsSinceEpoch;
-          final diff = now - sentTime.toInt();
-          _pingMs = diff > 0 && diff < 500 ? diff : 3;
-        }
-
-        // Parse optional processes, quotas, sessions if provided by companion
-        if (json.containsKey('claude')) {
-          _claudeQuota = ClaudeQuota.fromJson(json['claude']);
-        }
-        notifyListeners();
-      } else if (type == 'mic_state') {
-        final isMuted = json['mic_muted'] as bool? ?? false;
-        _stats = SystemStats(
-          cpu: _stats.cpu,
-          cpuCores: _stats.cpuCores,
-          ramUsedGb: _stats.ramUsedGb,
-          ramTotalGb: _stats.ramTotalGb,
-          ramPercent: _stats.ramPercent,
-          diskUsedGb: _stats.diskUsedGb,
-          diskTotalGb: _stats.diskTotalGb,
-          diskPercent: _stats.diskPercent,
-          hasBattery: _stats.hasBattery,
-          batteryPercent: _stats.batteryPercent,
-          isCharging: _stats.isCharging,
-          uploadKbps: _stats.uploadKbps,
-          downloadKbps: _stats.downloadKbps,
-          volumeLevel: _stats.volumeLevel,
-          isMuted: _stats.isMuted,
-          isMicMuted: isMuted,
-          uptime: _stats.uptime,
-          hostname: _stats.hostname,
-        );
-        notifyListeners();
-      } else if (type == 'clipboard_content') {
-        _clipboardContent = json['text'] as String? ?? '';
-        notifyListeners();
-      } else if (type == 'notify') {
-        _bannerNotification = json['message'] as String?;
-        notifyListeners();
-        Future.delayed(const Duration(seconds: 3), () {
-          if (_bannerNotification != null) {
-            _bannerNotification = null;
-            notifyListeners();
+      switch (type) {
+        case 'stats':
+          _stats = SystemStats.fromJson(json);
+          final sentTime = json['timestamp'] as num?;
+          if (sentTime != null) {
+            final now = DateTime.now().millisecondsSinceEpoch;
+            final diff = now - sentTime.toInt();
+            _pingMs = diff > 0 && diff < 500 ? diff : 3;
           }
-        });
+          notifyListeners();
+          break;
+
+        case 'claude':
+          _claudeQuota = ClaudeQuota.fromJson(json);
+          notifyListeners();
+          break;
+
+        case 'github':
+          _githubData = GitHubWorkspaceData.fromJson(json);
+          notifyListeners();
+          break;
+
+        case 'weather':
+          _weather = WeatherData.fromJson(json);
+          notifyListeners();
+          break;
+
+        case 'processes':
+          final items = json['items'] as List<dynamic>? ?? const [];
+          _processes = items
+              .whereType<Map<String, dynamic>>()
+              .map((p) => SystemProcessItem.fromJson(p))
+              .toList();
+          notifyListeners();
+          break;
+
+        case 'sessions':
+          final items = json['items'] as List<dynamic>? ?? const [];
+          _aiSessions = items
+              .whereType<Map<String, dynamic>>()
+              .map((s) => AiSessionItem.fromJson(s))
+              .toList();
+          notifyListeners();
+          break;
+
+        case 'docker':
+          _dockerAvailable = json['docker_available'] as bool? ?? false;
+          _containerCount = (json['container_count'] as num?)?.toInt() ?? 0;
+          _freeDisksCount = (json['free_disks_count'] as num?)?.toInt() ?? 0;
+          notifyListeners();
+          break;
+
+        case 'mic_state':
+          final isMuted = json['mic_muted'] as bool? ?? false;
+          _stats = SystemStats(
+            cpu: _stats.cpu,
+            cpuCores: _stats.cpuCores,
+            ramUsedGb: _stats.ramUsedGb,
+            ramTotalGb: _stats.ramTotalGb,
+            ramPercent: _stats.ramPercent,
+            diskUsedGb: _stats.diskUsedGb,
+            diskTotalGb: _stats.diskTotalGb,
+            diskPercent: _stats.diskPercent,
+            hasBattery: _stats.hasBattery,
+            batteryPercent: _stats.batteryPercent,
+            isCharging: _stats.isCharging,
+            uploadKbps: _stats.uploadKbps,
+            downloadKbps: _stats.downloadKbps,
+            volumeLevel: _stats.volumeLevel,
+            isMuted: _stats.isMuted,
+            isMicMuted: isMuted,
+            uptime: _stats.uptime,
+            hostname: _stats.hostname,
+            disks: _stats.disks,
+            gpu: _stats.gpu,
+          );
+          notifyListeners();
+          break;
+
+        case 'clipboard_content':
+          _clipboardContent = json['text'] as String? ?? '';
+          notifyListeners();
+          break;
+
+        case 'notify':
+          _bannerNotification = json['message'] as String?;
+          notifyListeners();
+          Future.delayed(const Duration(seconds: 3), () {
+            if (_bannerNotification != null) {
+              _bannerNotification = null;
+              notifyListeners();
+            }
+          });
+          break;
       }
     } catch (e) {
       debugPrint("[Parse Error] $e");
@@ -252,32 +302,10 @@ class ConnectionService extends ChangeNotifier {
 
   void sendMediaAction(String action) {
     sendCommand('media', {'action': action});
-    if (action == 'play_pause') {
-      _mediaTrack = MediaTrackInfo(
-        title: _mediaTrack.title,
-        artist: _mediaTrack.artist,
-        source: _mediaTrack.source,
-        currentSeconds: _mediaTrack.currentSeconds,
-        totalSeconds: _mediaTrack.totalSeconds,
-        isPlaying: !_mediaTrack.isPlaying,
-        volume: _mediaTrack.volume,
-      );
-      notifyListeners();
-    }
   }
 
   void setVolume(int level) {
     sendCommand('set_volume', {'level': level});
-    _mediaTrack = MediaTrackInfo(
-      title: _mediaTrack.title,
-      artist: _mediaTrack.artist,
-      source: _mediaTrack.source,
-      currentSeconds: _mediaTrack.currentSeconds,
-      totalSeconds: _mediaTrack.totalSeconds,
-      isPlaying: _mediaTrack.isPlaying,
-      volume: level,
-    );
-    notifyListeners();
   }
 
   void setMute(bool muted) {
@@ -320,53 +348,30 @@ class ConnectionService extends ChangeNotifier {
     sendCommand('mouse_scroll', {'dy': dy});
   }
 
-  // AI Session Permission Prompts
-  void respondToSessionPermission(String sessionId, bool allow) {
-    sendCommand('session_permission', {'id': sessionId, 'allow': allow});
-    final idx = _aiSessions.indexWhere((s) => s.id == sessionId);
-    if (idx != -1) {
-      final old = _aiSessions[idx];
-      _aiSessions[idx] = AiSessionItem(
-        id: old.id,
-        name: old.name,
-        provider: old.provider,
-        status: allow ? AiSessionStatus.working : AiSessionStatus.idle,
-        statusText: allow ? 'Working' : 'Denied / Idle',
-        duration: 'just now',
-      );
-      notifyListeners();
-    }
-  }
-
-  // Kill Process
+  // Kill Process -- optimistically remove from the list; the PC companion's
+  // next real process snapshot is the source of truth.
   void killProcess(String name) {
     sendCommand('kill_process', {'name': name});
-    _processes.removeWhere((p) => p.name == name);
+    _processes = _processes.where((p) => p.name != name).toList();
     notifyListeners();
   }
 
-  // Refresh Claude Quota
+  // Pull-to-refresh style manual refreshes -- the PC companion recomputes
+  // and sends back real data; no local fabrication.
   void refreshClaudeQuota() {
     sendCommand('get_claude_quota');
-    _claudeQuota = ClaudeQuota(
-      sessionPct: (_claudeQuota.sessionPct + 1.0).clamp(0.0, 100.0),
-      sessionReset: _claudeQuota.sessionReset,
-      sessionStatus: _claudeQuota.sessionStatus,
-      weeklyPct: _claudeQuota.weeklyPct,
-      weeklyReset: _claudeQuota.weeklyReset,
-      weeklyStatus: _claudeQuota.weeklyStatus,
-      weeklyFablePct: _claudeQuota.weeklyFablePct,
-      weeklyFableReset: _claudeQuota.weeklyFableReset,
-      weeklyFableStatus: _claudeQuota.weeklyFableStatus,
-      codexSessionPct: _claudeQuota.codexSessionPct,
-      codexReset: _claudeQuota.codexReset,
-      lastUpdated: 'just now',
-      tier: _claudeQuota.tier,
-      tokensUsed: _claudeQuota.tokensUsed,
-      tokensTotal: _claudeQuota.tokensTotal,
-      burnRate: _claudeQuota.burnRate,
-    );
-    notifyListeners();
+  }
+
+  void refreshGithub() {
+    sendCommand('get_github');
+  }
+
+  void refreshProcesses() {
+    sendCommand('get_processes');
+  }
+
+  void refreshWeather() {
+    sendCommand('get_weather');
   }
 
   @override

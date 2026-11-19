@@ -3,27 +3,27 @@ import 'package:flutter/material.dart';
 class DeskStatusHeader extends StatelessWidget {
   final String hostname;
   final bool isConnected;
+  final bool hasBattery;
   final int batteryPercent;
   final bool isCharging;
   final double claudePct;
-  final double codexPct;
-  final int waitingCount;
+  final int activeSessionCount;
   final VoidCallback? onExit;
   final VoidCallback? onConnectTap;
-  final VoidCallback? onWaitingTap;
+  final VoidCallback? onActiveSessionsTap;
 
   const DeskStatusHeader({
     super.key,
     required this.hostname,
     required this.isConnected,
-    this.batteryPercent = 82,
-    this.isCharging = true,
-    this.claudePct = 34.0,
-    this.codexPct = 12.0,
-    this.waitingCount = 1,
+    this.hasBattery = false,
+    this.batteryPercent = 0,
+    this.isCharging = false,
+    this.claudePct = 0.0,
+    this.activeSessionCount = 0,
     this.onExit,
     this.onConnectTap,
-    this.onWaitingTap,
+    this.onActiveSessionsTap,
   });
 
   @override
@@ -43,11 +43,11 @@ class DeskStatusHeader extends StatelessWidget {
                   width: 6.5,
                   height: 6.5,
                   decoration: BoxDecoration(
-                    color: isConnected ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                    color: isConnected ? const Color(0xFF30D158) : const Color(0xFFFF453A),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: (isConnected ? const Color(0xFF10B981) : const Color(0xFFEF4444))
+                        color: (isConnected ? const Color(0xFF30D158) : const Color(0xFFFF453A))
                             .withValues(alpha: 0.5),
                         blurRadius: 4,
                       ),
@@ -56,7 +56,7 @@ class DeskStatusHeader extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
                 const Text(
-                  'DeskFlow',
+                  'DESKFLOW',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
@@ -82,24 +82,26 @@ class DeskStatusHeader extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Battery
-              Icon(
-                isCharging ? Icons.battery_charging_full_rounded : Icons.battery_std_rounded,
-                size: 13,
-                color: const Color(0xFFA78BFA),
-              ),
-              const SizedBox(width: 3),
-              Text(
-                '$batteryPercent%',
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFFA78BFA),
+              // Battery (only shown when the PC actually reports one)
+              if (hasBattery) ...[
+                Icon(
+                  isCharging ? Icons.battery_charging_full_rounded : Icons.battery_std_rounded,
+                  size: 13,
+                  color: const Color(0xFFA78BFA),
                 ),
-              ),
-              const SizedBox(width: 10),
+                const SizedBox(width: 3),
+                Text(
+                  '$batteryPercent%',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFA78BFA),
+                  ),
+                ),
+                const SizedBox(width: 10),
+              ],
 
-              // Claude Quota Mini
+              // Claude Quota Mini (real local usage estimate)
               Text(
                 'Claude ${claudePct.toInt()}%',
                 style: TextStyle(
@@ -110,36 +112,25 @@ class DeskStatusHeader extends StatelessWidget {
               ),
               const SizedBox(width: 8),
 
-              // Codex Quota Mini
-              Text(
-                'Codex ${codexPct.toInt()}%',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white.withValues(alpha: 0.7),
-                ),
-              ),
-              const SizedBox(width: 8),
-
-              // Waiting Badge
-              if (waitingCount > 0)
+              // Active Claude Code Sessions Badge
+              if (activeSessionCount > 0)
                 GestureDetector(
-                  onTap: onWaitingTap,
+                  onTap: onActiveSessionsTap,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFF5252).withValues(alpha: 0.18),
+                      color: const Color(0xFFFF9F0A).withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
-                        color: const Color(0xFFFF5252).withValues(alpha: 0.35),
+                        color: const Color(0xFFFF9F0A).withValues(alpha: 0.35),
                       ),
                     ),
                     child: Text(
-                      '$waitingCount waiting',
+                      '$activeSessionCount active',
                       style: const TextStyle(
                         fontSize: 9.5,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFFFF6E6E),
+                        color: Color(0xFFFF9F0A),
                       ),
                     ),
                   ),

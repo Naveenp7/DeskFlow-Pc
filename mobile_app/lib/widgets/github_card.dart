@@ -16,10 +16,10 @@ class GitHubCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF11131B),
+        color: const Color(0xFF15151B),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: const Color(0xFF1E212E),
+          color: const Color(0xFF26262E),
           width: 1,
         ),
       ),
@@ -67,7 +67,7 @@ class GitHubCard extends StatelessWidget {
                     const Icon(
                       Icons.notifications_rounded,
                       size: 11,
-                      color: Color(0xFFFBBF24),
+                      color: Color(0xFFFFD60A),
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -75,7 +75,7 @@ class GitHubCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFFFBBF24),
+                        color: Color(0xFFFFD60A),
                       ),
                     ),
                   ],
@@ -87,7 +87,22 @@ class GitHubCard extends StatelessWidget {
 
           // Content Area (Scrollable if needed)
           Expanded(
-            child: SingleChildScrollView(
+            child: !data.configured
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(
+                        'Add a GitHub token to pc_companion/config.json\nto see your real PRs & review requests here.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white.withValues(alpha: 0.35),
+                        ),
+                      ),
+                    ),
+                  )
+                : SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -117,9 +132,19 @@ class GitHubCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
 
+                  if (data.reviewRequests.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Text(
+                        'No review requests right now.',
+                        style: TextStyle(fontSize: 10.5, color: Colors.white.withValues(alpha: 0.35)),
+                      ),
+                    ),
                   ...data.reviewRequests.map((rev) => _ReviewRow(
                         review: rev,
-                        onTap: () => onOpenUrl?.call('https://github.com/pulls'),
+                        onTap: () => onOpenUrl?.call(
+                          rev.url.isNotEmpty ? rev.url : 'https://github.com/pulls',
+                        ),
                       )),
 
                   const SizedBox(height: 12),
@@ -149,9 +174,19 @@ class GitHubCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
 
+                  if (data.pullRequests.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Text(
+                        'No open pull requests.',
+                        style: TextStyle(fontSize: 10.5, color: Colors.white.withValues(alpha: 0.35)),
+                      ),
+                    ),
                   ...data.pullRequests.map((pr) => _PullRequestRow(
                         pr: pr,
-                        onTap: () => onOpenUrl?.call('https://github.com/pulls'),
+                        onTap: () => onOpenUrl?.call(
+                          pr.url.isNotEmpty ? pr.url : 'https://github.com/pulls',
+                        ),
                       )),
                 ],
               ),
@@ -237,20 +272,20 @@ class _PullRequestRow extends StatelessWidget {
     Widget icon;
     switch (pr.status) {
       case PrStatus.approved:
-        icon = const Icon(Icons.check_rounded, size: 12, color: Color(0xFF10B981));
+        icon = const Icon(Icons.check_rounded, size: 12, color: Color(0xFF30D158));
         break;
       case PrStatus.inReview:
         icon = Container(
           width: 6,
           height: 6,
           decoration: const BoxDecoration(
-            color: Color(0xFFF59E0B),
+            color: Color(0xFFFFD60A),
             shape: BoxShape.circle,
           ),
         );
         break;
       case PrStatus.changes:
-        icon = const Icon(Icons.close_rounded, size: 12, color: Color(0xFFEF4444));
+        icon = const Icon(Icons.close_rounded, size: 12, color: Color(0xFFFF453A));
         break;
       case PrStatus.draft:
         icon = Text(
@@ -326,7 +361,7 @@ class _PullRequestRow extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                     color: pr.status == PrStatus.approved
                         ? const Color(0xFF34D399)
-                        : const Color(0xFFF87171),
+                        : const Color(0xFFFF453A),
                   ),
                 ),
               ),

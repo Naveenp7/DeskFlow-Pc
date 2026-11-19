@@ -1,0 +1,10 @@
+{
+  "github_token": "",
+  "github_username": "",
+  "claude_tier_label": "Local estimate",
+  "claude_session_token_budget": 150000,
+  "claude_weekly_token_budget": 800000,
+  "weather_lat": null,
+  "weather_lon": null,
+  "weather_city": null
+}

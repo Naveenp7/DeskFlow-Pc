@@ -1,5 +1,17 @@
 import 'package:flutter/material.dart';
 
+const Map<String, IconData> _weatherIcons = {
+  'sunny': Icons.wb_sunny_rounded,
+  'cloudy': Icons.cloud_rounded,
+  'fog': Icons.foggy,
+  'rain': Icons.grain_rounded,
+  'snow': Icons.ac_unit_rounded,
+  'storm': Icons.thunderstorm_rounded,
+};
+
+IconData weatherIconFor(String condition) =>
+    _weatherIcons[condition] ?? Icons.cloud_rounded;
+
 class ForecastDay {
   final String day;
   final IconData icon;
@@ -14,9 +26,20 @@ class ForecastDay {
     required this.minTemp,
     required this.rainPct,
   });
+
+  factory ForecastDay.fromJson(Map<String, dynamic> json) {
+    return ForecastDay(
+      day: json['day'] as String? ?? '',
+      icon: weatherIconFor(json['icon'] as String? ?? 'cloudy'),
+      maxTemp: (json['max_temp'] as num?)?.round() ?? 0,
+      minTemp: (json['min_temp'] as num?)?.round() ?? 0,
+      rainPct: (json['rain_pct'] as num?)?.round() ?? 0,
+    );
+  }
 }
 
 class WeatherData {
+  final bool available;
   final String city;
   final int temp;
   final String condition;
@@ -26,6 +49,7 @@ class WeatherData {
   final List<ForecastDay> forecast;
 
   const WeatherData({
+    required this.available,
     required this.city,
     required this.temp,
     required this.condition,
@@ -35,88 +59,34 @@ class WeatherData {
     required this.forecast,
   });
 
-  static WeatherData mock() {
+  factory WeatherData.initial() {
     return const WeatherData(
-      city: 'Tallinn',
-      temp: 6,
-      condition: 'Overcast',
-      maxTemp: 6,
-      minTemp: 3,
-      feelsLike: 2,
-      forecast: [
-        ForecastDay(
-          day: 'Today',
-          icon: Icons.grain_rounded,
-          maxTemp: 6,
-          minTemp: 3,
-          rainPct: 100,
-        ),
-        ForecastDay(
-          day: 'Wed',
-          icon: Icons.cloud_rounded,
-          maxTemp: 6,
-          minTemp: 4,
-          rainPct: 54,
-        ),
-        ForecastDay(
-          day: 'Thu',
-          icon: Icons.wb_sunny_rounded,
-          maxTemp: 4,
-          minTemp: 3,
-          rainPct: 54,
-        ),
-        ForecastDay(
-          day: 'Fri',
-          icon: Icons.thunderstorm_rounded,
-          maxTemp: 6,
-          minTemp: 3,
-          rainPct: 55,
-        ),
-      ],
+      available: false,
+      city: '',
+      temp: 0,
+      condition: 'cloudy',
+      maxTemp: 0,
+      minTemp: 0,
+      feelsLike: 0,
+      forecast: [],
     );
   }
-}
 
-class MediaTrackInfo {
-  final String title;
-  final String artist;
-  final String source;
-  final int currentSeconds;
-  final int totalSeconds;
-  final bool isPlaying;
-  final int volume;
-
-  const MediaTrackInfo({
-    required this.title,
-    required this.artist,
-    required this.source,
-    required this.currentSeconds,
-    required this.totalSeconds,
-    required this.isPlaying,
-    required this.volume,
-  });
-
-  String get positionStr {
-    final m = currentSeconds ~/ 60;
-    final s = (currentSeconds % 60).toString().padLeft(2, '0');
-    return '$m:$s';
-  }
-
-  String get totalStr {
-    final m = totalSeconds ~/ 60;
-    final s = (totalSeconds % 60).toString().padLeft(2, '0');
-    return '$m:$s';
-  }
-
-  static MediaTrackInfo mock() {
-    return const MediaTrackInfo(
-      title: 'Midnight Circuit',
-      artist: 'Neon Harbor · Low Tide Lights',
-      source: 'SPOTIFY',
-      currentSeconds: 160,
-      totalSeconds: 214,
-      isPlaying: true,
-      volume: 42,
+  factory WeatherData.fromJson(Map<String, dynamic> json) {
+    if (json['available'] != true) return WeatherData.initial();
+    final forecastJson = json['forecast'] as List<dynamic>? ?? const [];
+    return WeatherData(
+      available: true,
+      city: json['city'] as String? ?? 'Current location',
+      temp: (json['temp'] as num?)?.round() ?? 0,
+      condition: json['condition'] as String? ?? 'cloudy',
+      maxTemp: (json['max_temp'] as num?)?.round() ?? 0,
+      minTemp: (json['min_temp'] as num?)?.round() ?? 0,
+      feelsLike: (json['feels_like'] as num?)?.round() ?? 0,
+      forecast: forecastJson
+          .whereType<Map<String, dynamic>>()
+          .map((d) => ForecastDay.fromJson(d))
+          .toList(),
     );
   }
 }

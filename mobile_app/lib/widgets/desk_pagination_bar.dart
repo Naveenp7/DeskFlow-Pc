@@ -64,7 +64,7 @@ class DeskPaginationBar extends StatelessWidget {
               isAutoCycle ? Icons.pause_rounded : Icons.play_arrow_rounded,
               size: 11,
               color: isAutoCycle
-                  ? const Color(0xFF00E5FF)
+                  ? const Color(0xFF0A84FF)
                   : Colors.white.withValues(alpha: 0.35),
             ),
           ),

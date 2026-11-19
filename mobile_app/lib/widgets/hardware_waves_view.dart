@@ -1,34 +1,31 @@
 import 'package:flutter/material.dart';
+import '../models/system_stats.dart';
 import 'wave_sparkline.dart';
 
 class HardwareWavesView extends StatelessWidget {
   final double cpuPct;
-  final String cpuTemp;
-  final double gpuPct;
-  final String gpuTemp;
+  final GpuInfo? gpu;
   final double ramUsedGb;
   final double ramTotalGb;
-  final double vramUsedGb;
-  final double vramTotalGb;
+  final List<DiskInfo> disks;
   final double downMBs;
   final double upKBs;
   final int pingMs;
   final String uptime;
+  final int cpuCores;
 
   const HardwareWavesView({
     super.key,
-    this.cpuPct = 10.0,
-    this.cpuTemp = '53°C',
-    this.gpuPct = 7.0,
-    this.gpuTemp = '53°C · 38 W',
-    this.ramUsedGb = 21.2,
-    this.ramTotalGb = 64.0,
-    this.vramUsedGb = 5.8,
-    this.vramTotalGb = 16.0,
-    this.downMBs = 8.7,
-    this.upKBs = 332.0,
-    this.pingMs = 9,
-    this.uptime = 'Up 3 d 5 h',
+    this.cpuPct = 0.0,
+    this.gpu,
+    this.ramUsedGb = 0.0,
+    this.ramTotalGb = 0.0,
+    this.disks = const [],
+    this.downMBs = 0.0,
+    this.upKBs = 0.0,
+    this.pingMs = 0,
+    this.uptime = '--',
+    this.cpuCores = 0,
   });
 
   @override
@@ -49,9 +46,9 @@ class HardwareWavesView extends StatelessWidget {
                     child: WaveSparklineCard(
                       title: 'Processor',
                       valueText: '${cpuPct.toStringAsFixed(0)}%',
-                      subText: cpuTemp,
-                      networkSub: 'AMD Ryzen 9 7950X 16-Core',
-                      primaryColor: const Color(0xFF00E5FF),
+                      subText: cpuCores > 0 ? '$cpuCores logical cores' : '',
+                      networkSub: 'Live from PC companion',
+                      primaryColor: const Color(0xFF0A84FF),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -62,9 +59,9 @@ class HardwareWavesView extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF12141E),
+                        color: const Color(0xFF15151B),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFF1E2232)),
+                        border: Border.all(color: const Color(0xFF26262E)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -79,7 +76,7 @@ class HardwareWavesView extends StatelessWidget {
                                   fontSize: 10,
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: 0.8,
-                                  color: Color(0xFFA855F7),
+                                  color: Color(0xFFBF5AF2),
                                 ),
                               ),
                               Text(
@@ -96,31 +93,44 @@ class HardwareWavesView extends StatelessWidget {
                           // RAM Progress bar
                           _HardwareBarRow(
                             label: 'RAM',
-                            valueStr:
-                                '${ramUsedGb.toStringAsFixed(1)} / ${ramTotalGb.toStringAsFixed(0)} GB',
-                            ratio: (ramUsedGb / ramTotalGb).clamp(0.0, 1.0),
-                            color: const Color(0xFFA855F7),
+                            valueStr: ramTotalGb > 0
+                                ? '${ramUsedGb.toStringAsFixed(1)} / ${ramTotalGb.toStringAsFixed(0)} GB'
+                                : '--',
+                            ratio: ramTotalGb > 0 ? (ramUsedGb / ramTotalGb).clamp(0.0, 1.0) : 0.0,
+                            color: const Color(0xFFBF5AF2),
                           ),
 
-                          // VRAM RTX 4080
+                          // VRAM (real NVIDIA GPU, if detected)
                           _HardwareBarRow(
-                            label: 'VRAM · GeForce RTX 4080',
-                            valueStr:
-                                '${vramUsedGb.toStringAsFixed(1)} / ${vramTotalGb.toStringAsFixed(0)} GB',
-                            ratio: (vramUsedGb / vramTotalGb).clamp(0.0, 1.0),
+                            label: gpu != null ? 'VRAM · ${gpu!.name}' : 'VRAM',
+                            valueStr: gpu != null
+                                ? '${gpu!.vramUsedGb.toStringAsFixed(1)} / ${gpu!.vramTotalGb.toStringAsFixed(0)} GB'
+                                : 'No NVIDIA GPU detected',
+                            ratio: gpu != null && gpu!.vramTotalGb > 0
+                                ? (gpu!.vramUsedGb / gpu!.vramTotalGb).clamp(0.0, 1.0)
+                                : 0.0,
                             color: const Color(0xFF84CC16),
                           ),
 
-                          // Disks Row
-                          Row(
-                            children: [
-                              _MiniDiskBar(label: 'C:', pct: 61),
-                              const SizedBox(width: 12),
-                              _MiniDiskBar(label: 'D:', pct: 73),
-                              const SizedBox(width: 12),
-                              _MiniDiskBar(label: 'E:', pct: 8),
-                            ],
-                          ),
+                          // Disks Row (real detected fixed drives)
+                          if (disks.isEmpty)
+                            Text(
+                              'No drives reported',
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white.withValues(alpha: 0.35),
+                              ),
+                            )
+                          else
+                            Row(
+                              children: [
+                                for (int i = 0; i < disks.length && i < 3; i++) ...[
+                                  if (i > 0) const SizedBox(width: 12),
+                                  _MiniDiskBar(label: disks[i].label, pct: disks[i].percent.round()),
+                                ],
+                              ],
+                            ),
                         ],
                       ),
                     ),
@@ -140,9 +150,11 @@ class HardwareWavesView extends StatelessWidget {
                     flex: 48,
                     child: WaveSparklineCard(
                       title: 'Graphics',
-                      valueText: '${gpuPct.toStringAsFixed(0)}%',
-                      subText: gpuTemp,
-                      networkSub: 'NVIDIA GeForce RTX 4080',
+                      valueText: gpu != null ? '${gpu!.percent.toStringAsFixed(0)}%' : '--',
+                      subText: gpu != null
+                          ? '${gpu!.tempC.toStringAsFixed(0)}°C · ${gpu!.powerW.toStringAsFixed(0)} W'
+                          : 'No dGPU detected',
+                      networkSub: gpu?.name ?? 'Integrated / unknown GPU',
                       primaryColor: const Color(0xFF84CC16),
                     ),
                   ),
@@ -155,9 +167,9 @@ class HardwareWavesView extends StatelessWidget {
                       title: 'Network',
                       valueText: '↓ ${downMBs.toStringAsFixed(1)} MB/s',
                       subText: '↑ ${upKBs.toStringAsFixed(0)} KB/s',
-                      networkSub: 'Ping $pingMs ms · loss 0%',
-                      primaryColor: const Color(0xFFF59E0B),
-                      secondaryColor: const Color(0xFF00E5FF),
+                      networkSub: pingMs > 0 ? 'Ping $pingMs ms' : 'Ping --',
+                      primaryColor: const Color(0xFFFFD60A),
+                      secondaryColor: const Color(0xFF0A84FF),
                       isNetworkDual: true,
                     ),
                   ),
@@ -192,12 +204,16 @@ class _HardwareBarRow extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 9.5,
-                fontWeight: FontWeight.w600,
-                color: Colors.white.withValues(alpha: 0.75),
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white.withValues(alpha: 0.75),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             Text(
@@ -214,7 +230,7 @@ class _HardwareBarRow extends StatelessWidget {
         Container(
           height: 4.5,
           decoration: BoxDecoration(
-            color: const Color(0xFF1E2232),
+            color: const Color(0xFF26262E),
             borderRadius: BorderRadius.circular(3),
           ),
           child: FractionallySizedBox(
@@ -267,7 +283,7 @@ class _MiniDiskBar extends StatelessWidget {
             child: Container(
               height: 4,
               decoration: BoxDecoration(
-                color: const Color(0xFF1E2232),
+                color: const Color(0xFF26262E),
                 borderRadius: BorderRadius.circular(2),
               ),
               child: FractionallySizedBox(
@@ -276,8 +292,8 @@ class _MiniDiskBar extends StatelessWidget {
                 child: Container(
                   decoration: BoxDecoration(
                     color: pct > 85
-                        ? const Color(0xFFEF4444)
-                        : const Color(0xFF38BDF8),
+                        ? const Color(0xFFFF453A)
+                        : const Color(0xFF64D2FF),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),

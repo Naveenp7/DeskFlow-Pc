@@ -132,7 +132,7 @@ class RadialGlowGauge extends StatelessWidget {
             style: TextStyle(
               fontSize: size * 0.095,
               fontWeight: FontWeight.w600,
-              color: statusColor ?? const Color(0xFF10B981),
+              color: statusColor ?? const Color(0xFF30D158),
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -163,7 +163,7 @@ class _RadialGlowPainter extends CustomPainter {
 
     // Background track (dark circle)
     final bgPaint = Paint()
-      ..color = const Color(0xFF1E202B)
+      ..color = const Color(0xFF26262E)
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;

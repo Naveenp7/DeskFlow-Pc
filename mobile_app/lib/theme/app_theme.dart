@@ -1,19 +1,26 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Backgrounds
-  static const Color background = Color(0xFF090D14);
-  static const Color surface = Color(0xFF111726);
-  static const Color surfaceCard = Color(0xFF161F33);
-  static const Color surfaceElevated = Color(0xFF1E293B);
+  // Backgrounds — true OLED black base with a neutral (non-blue-tinted) panel
+  // system, closer to iOS StandBy than the old blue-black "cyberpunk" look.
+  static const Color background = Color(0xFF000000);
+  static const Color surface = Color(0xFF121214);
+  static const Color surfaceCard = Color(0xFF1A1A20);
+  static const Color surfaceElevated = Color(0xFF202024);
 
-  // Accents
-  static const Color cyan = Color(0xFF00E5FF);
-  static const Color purple = Color(0xFF8B5CF6);
-  static const Color emerald = Color(0xFF10B981);
-  static const Color amber = Color(0xFFF59E0B);
-  static const Color rose = Color(0xFFF43F5E);
-  static const Color blue = Color(0xFF38BDF8);
+  // Panel system used by the desk-deck cards (standby screen & widgets)
+  static const Color panel = Color(0xFF15151B);
+  static const Color panelBorder = Color(0xFF26262E);
+  static const Color tileBg = Color(0xFF1A1A20);
+
+  // Accents — refined iOS-style palette
+  static const Color cyan = Color(0xFF0A84FF);
+  static const Color purple = Color(0xFFBF5AF2);
+  static const Color emerald = Color(0xFF30D158);
+  static const Color amber = Color(0xFFFFD60A);
+  static const Color standbyOrange = Color(0xFFFF9F0A);
+  static const Color rose = Color(0xFFFF453A);
+  static const Color blue = Color(0xFF64D2FF);
 
   // Text
   static const Color textPrimary = Color(0xFFF8FAFC);
@@ -22,7 +29,7 @@ class AppTheme {
 
   // Borders & Dividers
   static const Color border = Color(0x1FFFFFFF);
-  static const Color borderGlow = Color(0x3300E5FF);
+  static const Color borderGlow = Color(0x330A84FF);
 
   static ThemeData get darkTheme {
     return ThemeData(

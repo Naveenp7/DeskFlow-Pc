@@ -40,19 +40,19 @@ class TactileDeckGrid extends StatelessWidget {
       const TactileActionItem(
         label: 'VS Code',
         icon: Icons.edit_note_rounded,
-        color: Color(0xFF38BDF8),
+        color: Color(0xFF64D2FF),
         action: 'vscode',
       ),
       const TactileActionItem(
         label: 'Browser',
         icon: Icons.language_rounded,
-        color: Color(0xFF00E5FF),
+        color: Color(0xFF0A84FF),
         action: 'browser',
       ),
       const TactileActionItem(
         label: 'Files',
         icon: Icons.folder_rounded,
-        color: Color(0xFFFBBF24),
+        color: Color(0xFFFFD60A),
         action: 'files',
       ),
       const TactileActionItem(
@@ -64,7 +64,7 @@ class TactileDeckGrid extends StatelessWidget {
       const TactileActionItem(
         label: 'Discord',
         icon: Icons.chat_bubble_rounded,
-        color: Color(0xFFA855F7),
+        color: Color(0xFFBF5AF2),
         action: 'discord',
       ),
       const TactileActionItem(
@@ -82,7 +82,7 @@ class TactileDeckGrid extends StatelessWidget {
       TactileActionItem(
         label: isMuted ? 'Muted' : 'Mute',
         icon: isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-        color: const Color(0xFFF87171),
+        color: const Color(0xFFFF453A),
         action: 'mute',
         hasDot: true,
         isDotActive: isMuted,
@@ -96,7 +96,7 @@ class TactileDeckGrid extends StatelessWidget {
       const TactileActionItem(
         label: 'Lock',
         icon: Icons.lock_rounded,
-        color: Color(0xFFF87171),
+        color: Color(0xFFFF453A),
         action: 'lock_pc',
       ),
       const TactileActionItem(
@@ -163,7 +163,7 @@ class _TactileDeckButtonState extends State<_TactileDeckButton> {
           decoration: BoxDecoration(
             color: _isPressed
                 ? item.color.withValues(alpha: 0.22)
-                : const Color(0xFF161824).withValues(alpha: 0.8),
+                : const Color(0xFF1A1A20).withValues(alpha: 0.8),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: _isPressed
@@ -208,7 +208,7 @@ class _TactileDeckButtonState extends State<_TactileDeckButton> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: item.isDotActive
-                        ? const Color(0xFFEF4444)
+                        ? const Color(0xFFFF453A)
                         : Colors.white.withValues(alpha: 0.2),
                   ),
                 ),

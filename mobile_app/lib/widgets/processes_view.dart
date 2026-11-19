@@ -3,11 +3,13 @@ import '../models/system_process.dart';
 
 class ProcessesView extends StatefulWidget {
   final List<SystemProcessItem> processes;
+  final double totalCpuPct;
   final Function(SystemProcessItem item, String action)? onProcessAction;
 
   const ProcessesView({
     super.key,
     required this.processes,
+    this.totalCpuPct = 0.0,
     this.onProcessAction,
   });
 
@@ -22,10 +24,10 @@ class _ProcessesViewState extends State<ProcessesView> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF141624),
+        backgroundColor: const Color(0xFF1A1A20),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: Color(0xFF23273A)),
+          side: const BorderSide(color: Color(0xFF26262E)),
         ),
         title: Row(
           children: [
@@ -71,7 +73,7 @@ class _ProcessesViewState extends State<ProcessesView> {
               const SizedBox(height: 8),
               const Text(
                 '🔒 System-critical process protected from termination.',
-                style: TextStyle(color: Color(0xFFFBBF24), fontSize: 11.5),
+                style: TextStyle(color: Color(0xFFFFD60A), fontSize: 11.5),
               ),
             ],
           ],
@@ -84,7 +86,7 @@ class _ProcessesViewState extends State<ProcessesView> {
           if (!item.isProtected)
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEF4444),
+                backgroundColor: const Color(0xFFFF453A),
                 foregroundColor: Colors.white,
               ),
               onPressed: () {
@@ -94,7 +96,7 @@ class _ProcessesViewState extends State<ProcessesView> {
                   SnackBar(
                     content: Text('Terminating ${item.name} (${item.count} tasks)...'),
                     duration: const Duration(seconds: 2),
-                    backgroundColor: const Color(0xFF1E2130),
+                    backgroundColor: const Color(0xFF26262E),
                   ),
                 );
               },
@@ -117,10 +119,10 @@ class _ProcessesViewState extends State<ProcessesView> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF10121A),
+        color: const Color(0xFF15151B),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: const Color(0xFF1E212E),
+          color: const Color(0xFF26262E),
           width: 1,
         ),
       ),
@@ -144,7 +146,7 @@ class _ProcessesViewState extends State<ProcessesView> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Total CPU 40% · 312 processes · 141 apps · tap one for details',
+                    'Total CPU ${widget.totalCpuPct.toStringAsFixed(0)}% · top ${list.length} apps · tap one for details',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w500,
@@ -158,7 +160,7 @@ class _ProcessesViewState extends State<ProcessesView> {
               Container(
                 padding: const EdgeInsets.all(2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1B1E2B),
+                  color: const Color(0xFF1A1A20),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -182,7 +184,18 @@ class _ProcessesViewState extends State<ProcessesView> {
 
           // 2-Column Process Grid
           Expanded(
-            child: LayoutBuilder(
+            child: list.isEmpty
+                ? Center(
+                    child: Text(
+                      'Waiting for process data from the PC...',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withValues(alpha: 0.35),
+                      ),
+                    ),
+                  )
+                : LayoutBuilder(
               builder: (context, constraints) {
                 final isTwoCol = constraints.maxWidth > 350;
                 final cols = isTwoCol ? 2 : 1;
@@ -267,9 +280,9 @@ class _ProcessTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: const Color(0xFF141722),
+          color: const Color(0xFF1A1A20),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF1E2232)),
+          border: Border.all(color: const Color(0xFF26262E)),
         ),
         child: Row(
           children: [
@@ -329,7 +342,7 @@ class _ProcessTile extends StatelessWidget {
                         const Icon(
                           Icons.lock_rounded,
                           size: 10,
-                          color: Color(0xFFFBBF24),
+                          color: Color(0xFFFFD60A),
                         ),
                       ],
                     ],
