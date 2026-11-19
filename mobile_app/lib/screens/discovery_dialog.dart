@@ -37,6 +37,9 @@ class _DiscoveryDialogState extends State<DiscoveryDialog>
 
   @override
   void dispose() {
+    // Stop the UDP broadcast scan once the radar is closed, in keeping with
+    // the companion's zero-idle-CPU design -- no point scanning in the background.
+    context.read<DiscoveryService>().stopDiscovery();
     _radarController.dispose();
     _ipController.dispose();
     _portController.dispose();

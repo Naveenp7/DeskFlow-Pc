@@ -18,6 +18,7 @@ import urllib.error
 import webbrowser
 import ctypes
 from ctypes import wintypes
+from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -337,38 +338,46 @@ def get_disks():
     return disks
 
 
-# Per-process CPU% needs one primed call before it returns real deltas.
-_process_cpu_primed = False
+# Long-lived Process objects keyed by PID, so repeated calls to
+# get_processes_snapshot() measure a real CPU delta since the *last* call
+# (what psutil's cpu_percent(interval=None) is designed for) instead of
+# creating fresh Process objects every time, which always samples ~0%.
+# This dict only works if the same worker keeps calling this function --
+# see the dedicated single-worker process pool in DeskFlowServer.
+_proc_cache: dict = {}
 
 
 def get_processes_snapshot(limit=24):
     """Real running-process snapshot aggregated by executable name."""
-    global _process_cpu_primed
     try:
-        procs = list(psutil.process_iter(['name', 'cpu_percent', 'memory_info']))
-        if not _process_cpu_primed:
-            # First pass only seeds the internal cpu_percent baseline.
-            for p in procs:
+        current_pids = set()
+        for p in psutil.process_iter(['pid']):
+            pid = p.info['pid']
+            current_pids.add(pid)
+            if pid not in _proc_cache:
+                _proc_cache[pid] = p
                 try:
-                    p.cpu_percent(interval=None)
+                    p.cpu_percent(interval=None)  # seed baseline for new processes
                 except Exception:
                     pass
-            _process_cpu_primed = True
-            return []
 
+        for pid in list(_proc_cache.keys()):
+            if pid not in current_pids:
+                del _proc_cache[pid]
+
+        cpu_count = psutil.cpu_count(logical=True) or 1
         aggregated = {}
-        for p in procs:
+        for p in list(_proc_cache.values()):
             try:
-                info = p.info
-                name = (info.get('name') or 'Unknown').replace('.exe', '')
-                cpu = p.cpu_percent(interval=None) / (psutil.cpu_count(logical=True) or 1)
-                mem = (info.get('memory_info').rss if info.get('memory_info') else 0) / (1024 * 1024)
+                name = (p.name() or 'Unknown').replace('.exe', '')
+                cpu = p.cpu_percent(interval=None) / cpu_count
+                mem = p.memory_info().rss / (1024 * 1024)
                 if name not in aggregated:
                     aggregated[name] = {"name": name, "count": 0, "cpu_pct": 0.0, "ram_mb": 0.0}
                 aggregated[name]["count"] += 1
                 aggregated[name]["cpu_pct"] += cpu
                 aggregated[name]["ram_mb"] += mem
-            except (psutil.NoSuchProcess, psutil.AccessDenied, Exception):
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
 
         items = sorted(aggregated.values(), key=lambda x: x["cpu_pct"], reverse=True)
@@ -879,6 +888,18 @@ class DeskFlowServer:
         self.stats_task = None
         self.slow_stats_task = None
         self.running = True
+        # The Claude usage scan, GitHub and weather calls are slow (file
+        # scans, network) and run in separate PROCESSES, not threads: a
+        # worker thread touching pycaw's audio COM objects, even only via
+        # garbage collection finalizing one at the wrong moment, crashes
+        # the whole server with an access violation. A separate process
+        # can't share that COM apartment, so it's safe.
+        self.worker_pool = ProcessPoolExecutor(max_workers=2)
+        # Process snapshots get their own single dedicated worker so the
+        # same process keeps answering every call -- that's what lets
+        # get_processes_snapshot() measure real per-process CPU deltas
+        # between calls instead of resetting every time.
+        self.process_snapshot_pool = ProcessPoolExecutor(max_workers=1)
 
     async def broadcast_loop(self):
         """UDP auto-discovery beacon and responder."""
@@ -973,21 +994,39 @@ class DeskFlowServer:
 
     async def slow_telemetry_loop(self):
         """Lower-frequency real data: processes, Claude usage, sessions,
-        GitHub, weather, Docker/disks. Runs while clients are connected."""
+        GitHub, weather, Docker/disks. Runs while clients are connected.
+
+        Claude usage (a multi-day local log scan) and the process snapshot
+        can each take several real seconds on a heavily-used PC, and a
+        GitHub/weather call can stall on the network -- so they run in the
+        process pools above rather than directly on the event loop, which
+        would otherwise freeze mouse/keyboard commands and the 1s stats
+        stream for however long the slowest one takes.
+        """
         print("[Telemetry] Slow data stream started (processes/claude/github/weather).")
+        loop = asyncio.get_running_loop()
         tick = 0
         while self.running and len(self.connected_clients) > 0:
             try:
-                await self.broadcast({"type": "processes", "items": get_processes_snapshot()})
-                await self.broadcast(get_claude_usage(CONFIG))
-                await self.broadcast({"type": "sessions", "items": get_claude_sessions()})
+                items = await loop.run_in_executor(self.process_snapshot_pool, get_processes_snapshot)
+                await self.broadcast({"type": "processes", "items": items})
+
+                claude = await loop.run_in_executor(self.worker_pool, get_claude_usage, CONFIG)
+                await self.broadcast(claude)
+
+                await self.broadcast({
+                    "type": "sessions",
+                    "items": get_claude_sessions(),
+                })
                 await self.broadcast(get_docker_storage())
 
                 # GitHub + weather change slowly and hit the network, so they
                 # only refresh every ~3rd tick (~36s) to stay light-weight.
                 if tick % 3 == 0:
-                    await self.broadcast(get_github_data(CONFIG))
-                    await self.broadcast(get_weather(CONFIG))
+                    github = await loop.run_in_executor(self.worker_pool, get_github_data, CONFIG)
+                    await self.broadcast(github)
+                    weather = await loop.run_in_executor(self.worker_pool, get_weather, CONFIG)
+                    await self.broadcast(weather)
             except Exception as e:
                 print(f"[Slow Telemetry Error] {e}")
             tick += 1
@@ -1128,17 +1167,28 @@ class DeskFlowServer:
             }))
 
         # --- MANUAL REFRESH REQUESTS (pull-to-refresh on the phone) ---
+        # Offloaded to the process pools for the same reason as the slow
+        # telemetry loop: these can take real seconds and must not freeze
+        # the event loop or touch pycaw's COM objects from another thread.
         elif action_type == "get_claude_quota":
-            await ws.send(json.dumps(get_claude_usage(CONFIG)))
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(self.worker_pool, get_claude_usage, CONFIG)
+            await ws.send(json.dumps(result))
 
         elif action_type == "get_github":
-            await ws.send(json.dumps(get_github_data(CONFIG)))
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(self.worker_pool, get_github_data, CONFIG)
+            await ws.send(json.dumps(result))
 
         elif action_type == "get_processes":
-            await ws.send(json.dumps({"type": "processes", "items": get_processes_snapshot()}))
+            loop = asyncio.get_running_loop()
+            items = await loop.run_in_executor(self.process_snapshot_pool, get_processes_snapshot)
+            await ws.send(json.dumps({"type": "processes", "items": items}))
 
         elif action_type == "get_weather":
-            await ws.send(json.dumps(get_weather(CONFIG)))
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(self.worker_pool, get_weather, CONFIG)
+            await ws.send(json.dumps(result))
 
         # --- UNIVERSAL CLIPBOARD & SHARE ---
         elif action_type == "clipboard_send":
